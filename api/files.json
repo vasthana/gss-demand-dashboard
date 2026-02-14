@@ -1,6 +1,6 @@
 {
   "files": [
-    "api/sharepoint/Application_Data_Opportunity_Tracker.csv",
-    "api/sharepoint/Application_Data_Ramp_Down.csv"
+    "Application_Data_Opportunity_Tracker.csv",
+    "Application_Data_Ramp_Down.csv"
   ]
 }
