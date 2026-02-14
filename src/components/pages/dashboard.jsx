@@ -72,9 +72,8 @@ const Dashboard = ({ user, onLogout }) => {
   const chartSectionRef = React.useRef();
   const trackingPageCsvMap = useMemo(
     () => ({
-      "new-transitions":
-        "api/sharepoint/Application_Data_Opportunity_Tracker.csv",
-      "ramp-down-project": "api/sharepoint/Application_Data_Ramp_Down.csv",
+      "new-transitions": `${process.env.PUBLIC_URL}/api/sharepoint/Application_Data_Opportunity_Tracker.csv`,
+      "ramp-down-project": `${process.env.PUBLIC_URL}/api/sharepoint/Application_Data_Ramp_Down.csv`,
     }),
     [],
   );
@@ -258,29 +257,6 @@ const Dashboard = ({ user, onLogout }) => {
     return [];
   }, [filteredData, headers, activePage]);
 
-  // ================= AREA CHART =================
-  // const areaChartData = useMemo(() => {
-  //   if (!filteredData.length) return null;
-  //   const monthMap = {};
-  //   filteredData.forEach((row) => {
-  //     const month = row["Start Month"];
-  //     if (!month) return;
-  //     monthMap[month] = monthMap[month] || { hc: 0, contract: 0 };
-  //     const hcVal = Number(
-  //       (row["Actual HC"] || 0).toString().replace(/,/g, ""),
-  //     );
-  //     const contractVal = Number(
-  //       (row["Monthly Contract Value"] || 0).toString().replace(/,/g, ""),
-  //     );
-  //     monthMap[month].hc += isNaN(hcVal) ? 0 : hcVal;
-  //     monthMap[month].contract += isNaN(contractVal) ? 0 : contractVal;
-  //   });
-  //   const months = Object.keys(monthMap);
-  //   const hcValues = months.map((m) => monthMap[m].hc);
-  //   const contractValues = months.map((m) => monthMap[m].contract);
-  //   return { months, hcValues, contractValues };
-  // }, [filteredData]);
-
   const areaChartData = useMemo(() => {
     if (!filteredData.length) return null;
 
@@ -355,7 +331,7 @@ const Dashboard = ({ user, onLogout }) => {
   }, [activePage, trackingPageCsvMap, pageTitles]);
 
   useEffect(() => {
-    fetch("/api/files.json")
+    fetch(process.env.PUBLIC_URL + "/api/files.json")
       .then((res) => res.json())
       .then((data) => {
         if (data?.files?.length) {
@@ -365,11 +341,131 @@ const Dashboard = ({ user, onLogout }) => {
       .catch((err) => console.error("Error loading files.json:", err));
   }, []);
 
+  // useEffect(() => {
+  //   // Initialize first Trend CSV automatically
+  //   if (!selectedTrendCsv && dynamicTrends.length > 0) {
+  //     setSelectedTrendCsv(dynamicTrends[0].file);
+  //     setSelectedTrendTitle(dynamicTrends[0].label); // ✅ Title now matches sidebar
+  //     return;
+  //   }
+
+  //   if (!selectedTrendCsv) return;
+
+  //   setLoading(true);
+  //   setShowLoader(true);
+  //   const startTime = Date.now();
+
+  //   fetch(`/${selectedTrendCsv}`)
+  //     .then((res) => res.text())
+  //     .then((csvText) => {
+  //       Papa.parse(csvText, {
+  //         header: true,
+  //         skipEmptyLines: true,
+  //         dynamicTyping: true,
+  //         complete: (results) => {
+  //           const cleanHeaders = Object.keys(results.data[0] || {}).filter(
+  //             (h) => h.trim() !== "",
+  //           );
+
+  //           const cleanedData = results.data.map((row) => {
+  //             const newRow = {};
+  //             cleanHeaders.forEach((h) => (newRow[h] = row[h]));
+  //             return newRow;
+  //           });
+
+  //           setJsonData(cleanedData);
+  //           setHeaders(cleanHeaders);
+
+  //           const elapsed = Date.now() - startTime;
+  //           setTimeout(
+  //             () => {
+  //               setLoading(false);
+  //               setShowLoader(false);
+  //             },
+  //             Math.max(0, 1000 - elapsed),
+  //           );
+  //         },
+  //       });
+  //     })
+  //     .catch((err) => {
+  //       console.error("CSV load error:", err);
+  //       setLoading(false);
+  //       setShowLoader(false);
+  //     });
+  // }, [dynamicTrends, selectedTrendCsv]);
+
+  // useEffect(() => {
+  //   // 1️⃣ Initialize first Trend CSV automatically
+  //   if (!selectedTrendCsv && dynamicTrends.length > 0) {
+  //     setSelectedTrendCsv(dynamicTrends[0].file);
+  //     setSelectedTrendTitle(dynamicTrends[0].label); // Title now matches sidebar
+  //     return;
+  //   }
+
+  //   if (!selectedTrendCsv) return;
+
+  //   setLoading(true);
+  //   setShowLoader(true);
+  //   const startTime = Date.now();
+
+  //   // ✅ Build full CSV URL using PUBLIC_URL (works on GitHub Pages and localhost)
+  //   const csvUrl = `${process.env.PUBLIC_URL}/api/sharepoint/${selectedTrendCsv}`;
+
+  //   fetch(csvUrl)
+  //     .then((res) => {
+  //       if (!res.ok) {
+  //         throw new Error(
+  //           `Failed to fetch CSV: ${res.status} ${res.statusText}`,
+  //         );
+  //       }
+  //       return res.text();
+  //     })
+  //     .then((csvText) => {
+  //       Papa.parse(csvText, {
+  //         header: true,
+  //         skipEmptyLines: true,
+  //         dynamicTyping: true,
+  //         complete: (results) => {
+  //           const cleanHeaders = Object.keys(results.data[0] || {}).filter(
+  //             (h) => h.trim() !== "",
+  //           );
+
+  //           const cleanedData = results.data.map((row) => {
+  //             const newRow = {};
+  //             cleanHeaders.forEach((h) => (newRow[h] = row[h]));
+  //             return newRow;
+  //           });
+
+  //           setJsonData(cleanedData);
+  //           setHeaders(cleanHeaders);
+
+  //           const elapsed = Date.now() - startTime;
+  //           setTimeout(
+  //             () => {
+  //               setLoading(false);
+  //               setShowLoader(false);
+  //             },
+  //             Math.max(0, 1000 - elapsed),
+  //           );
+  //         },
+  //         error: (err) => {
+  //           console.error("Papa parse error:", err);
+  //           setLoading(false);
+  //           setShowLoader(false);
+  //         },
+  //       });
+  //     })
+  //     .catch((err) => {
+  //       console.error("CSV load error:", err, "URL:", csvUrl);
+  //       setLoading(false);
+  //       setShowLoader(false);
+  //     });
+  // }, [dynamicTrends, selectedTrendCsv]);
   useEffect(() => {
-    // Initialize first Trend CSV automatically
+    // 1️⃣ Initialize first Trend CSV automatically
     if (!selectedTrendCsv && dynamicTrends.length > 0) {
       setSelectedTrendCsv(dynamicTrends[0].file);
-      setSelectedTrendTitle(dynamicTrends[0].label); // ✅ Title now matches sidebar
+      setSelectedTrendTitle(dynamicTrends[0].label);
       return;
     }
 
@@ -379,18 +475,39 @@ const Dashboard = ({ user, onLogout }) => {
     setShowLoader(true);
     const startTime = Date.now();
 
-    fetch(`/${selectedTrendCsv}`)
-      .then((res) => res.text())
+    // ✅ Build CSV URL for GitHub Pages / local
+    const csvUrl = `${process.env.PUBLIC_URL}/api/sharepoint/${encodeURIComponent(selectedTrendCsv)}`;
+
+    fetch(csvUrl)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(
+            `Failed to fetch CSV: ${res.status} ${res.statusText}`,
+          );
+        }
+        return res.text();
+      })
       .then((csvText) => {
+        if (!csvText || csvText.trim() === "") {
+          console.warn("CSV is empty:", selectedTrendCsv);
+          setJsonData([]);
+          setHeaders([]);
+          setLoading(false);
+          setShowLoader(false);
+          return;
+        }
+
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true,
           complete: (results) => {
+            // ✅ Clean headers
             const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-              (h) => h.trim() !== "",
+              (h) => h && h.trim() !== "",
             );
 
+            // ✅ Clean rows
             const cleanedData = results.data.map((row) => {
               const newRow = {};
               cleanHeaders.forEach((h) => (newRow[h] = row[h]));
@@ -400,6 +517,7 @@ const Dashboard = ({ user, onLogout }) => {
             setJsonData(cleanedData);
             setHeaders(cleanHeaders);
 
+            // Ensure loader shows at least 1s
             const elapsed = Date.now() - startTime;
             setTimeout(
               () => {
@@ -409,15 +527,23 @@ const Dashboard = ({ user, onLogout }) => {
               Math.max(0, 1000 - elapsed),
             );
           },
+          error: (err) => {
+            console.error("Papa parse error:", err);
+            setJsonData([]);
+            setHeaders([]);
+            setLoading(false);
+            setShowLoader(false);
+          },
         });
       })
       .catch((err) => {
-        console.error("CSV load error:", err);
+        console.error("CSV load error:", err, "URL:", csvUrl);
+        setJsonData([]);
+        setHeaders([]);
         setLoading(false);
         setShowLoader(false);
       });
   }, [dynamicTrends, selectedTrendCsv]);
-
   const formatUSD = (val) => {
     if (val >= 1e6) return `$${(val / 1e6).toFixed(1)} M`;
     if (val >= 1e3) return `$${(val / 1e3).toFixed(1)} K`;

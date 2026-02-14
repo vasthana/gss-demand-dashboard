@@ -1,13 +1,16 @@
 // src/index.js
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { HashRouter } from "react-router-dom";
 import App from "./App";
-import "./css/global.css"; // use global CSS from css folder
+import "./css/global.css"; // your global styles
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 
 root.render(
   <React.StrictMode>
-    <App />
+    <HashRouter>
+      <App />
+    </HashRouter>
   </React.StrictMode>,
 );
