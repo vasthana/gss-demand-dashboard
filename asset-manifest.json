@@ -1,13 +1,13 @@
 {
   "files": {
-    "main.css": "/gss-demand-dashboard/static/css/main.d21ee740.css",
-    "main.js": "/gss-demand-dashboard/static/js/main.d333b86d.js",
-    "index.html": "/gss-demand-dashboard/index.html",
-    "main.d21ee740.css.map": "/gss-demand-dashboard/static/css/main.d21ee740.css.map",
-    "main.d333b86d.js.map": "/gss-demand-dashboard/static/js/main.d333b86d.js.map"
+    "main.css": "./static/css/main.d21ee740.css",
+    "main.js": "./static/js/main.e8d72049.js",
+    "index.html": "./index.html",
+    "main.d21ee740.css.map": "./static/css/main.d21ee740.css.map",
+    "main.e8d72049.js.map": "./static/js/main.e8d72049.js.map"
   },
   "entrypoints": [
     "static/css/main.d21ee740.css",
-    "static/js/main.d333b86d.js"
+    "static/js/main.e8d72049.js"
   ]
 }
