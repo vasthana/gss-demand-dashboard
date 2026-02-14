@@ -1,0 +1,173 @@
+/* ===== SIDEBAR MENU ===== */
+/* Sidebar */
+.sidebar {
+  width: 15.5vw;
+  background: #0f172a;
+  color: white;
+  padding: 20px 10px;
+  height: auto;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 10000;
+}
+
+.sidebar h2 {
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sidebar ul:nth-of-type(2) {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  height: 250px;
+}
+
+.sidebar li {
+  padding: 10px 10px 10px 0;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  position: relative;
+}
+
+.sidebar li:hover,
+.sidebar li.active {
+  background: #1e293b;
+}
+
+.menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* ===== MAIN NAV ITEM ===== */
+.menu > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  color: #e2e8f0;
+  border-radius: 6px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+/* LEFT SIDE (ICON + TITLE) */
+.menu-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  width: 100%;
+  position: relative;
+}
+
+.menu-parent svg:nth-child(2) {
+  position: absolute;
+  left: 88.88%;
+  top: 12px;
+}
+
+/* ICON STYLE */
+.menu-icon {
+  font-size: 18px;
+  min-width: 22px; /* keeps all titles aligned */
+  text-align: center;
+  color: #94a3b8;
+}
+
+/* ARROW ICON (RIGHT SIDE) */
+.menu-arrow {
+  font-size: 18px;
+  min-width: 22px;
+  text-align: center;
+  color: #94a3b8;
+}
+
+/* Hover effect */
+.menu > li:hover {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+/* ===== SUBMENU ===== */
+.submenu {
+  list-style: none;
+  padding-left: 50px; /* aligns sub nav text with main nav text */
+  margin: 4px 0 8px 0;
+}
+
+/* SUBMENU ITEMS */
+.submenu li {
+  padding: 4px 10px 10px 30px;
+  cursor: pointer;
+  font-size: 12.8px;
+  font-weight: 500;
+  color: #cbd5e1;
+  border-radius: 5px;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+/* Submenu hover */
+.submenu li:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+/* Active submenu */
+.submenu li.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.submenu {
+  max-height: 320px; /* limit height */
+  overflow-y: auto; /* enable vertical scroll */
+  padding-right: 6px; /* space for scrollbar */
+}
+
+/* Optional: make scrollbar cleaner */
+.submenu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.submenu::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+
+.submenu {
+  max-height: 320px;
+  overflow-y: auto;
+
+  /* Hide scrollbar for Chrome, Safari and Edge */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.submenu::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Smooth touch-like scrolling */
+.submenu {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
