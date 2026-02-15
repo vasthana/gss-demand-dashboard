@@ -357,3 +357,45 @@ canvas {
 .chart-container {
   height: 250px;
 }
+
+/* ================= MOBILE ONLY KPI SCROLL (ALL BROWSERS) ================= */
+@media (max-width: 768px) {
+  .kpi-row {
+    display: flex; /* ensure flex everywhere */
+    flex-wrap: nowrap;
+    overflow-x: auto;
+
+    /* smooth scrolling */
+    -webkit-overflow-scrolling: touch; /* iOS Safari */
+    scroll-behavior: smooth;
+
+    /* Firefox scrollbar hide */
+    scrollbar-width: none;
+
+    /* IE/old Edge */
+    -ms-overflow-style: none;
+
+    gap: 14px;
+    padding-bottom: 8px;
+  }
+
+  /* Chrome / Safari / new Edge */
+  .kpi-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* prevent cards shrinking so swipe works */
+  .kpi-card {
+    flex: 0 0 auto;
+    min-width: 240px;
+  }
+
+  /* optional mobile typography tuning */
+  .kpi-total {
+    font-size: 30px;
+  }
+
+  .kpi-card h3 {
+    font-size: 14px;
+  }
+}
