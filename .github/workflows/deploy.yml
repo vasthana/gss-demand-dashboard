@@ -1,46 +1,9 @@
-# name: Deploy React App to GitHub Pages
-
-# on:
-#   push:
-#     branches:
-#       - main # change if your production branch is different
-
-# permissions:
-#   contents: write
-
-# jobs:
-#   build-and-deploy:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v4
-
-#       - name: Setup Node.js
-#         uses: actions/setup-node@v4
-#         with:
-#           node-version: 18
-
-#       - name: Install dependencies
-#         run: npm install
-
-#       - name: Build project
-#         run: npm run build
-
-#       - name: Deploy to gh-pages branch
-#         uses: peaceiris/actions-gh-pages@v4
-#         with:
-#           github_token: ${{ secrets.GITHUB_TOKEN }}
-#           publish_dir: ./build
-
 name: Deploy React App to GitHub Pages
 
-# Trigger this workflow after 'Update CSVs to GH Pages' workflow completes
 on:
-  workflow_run:
-    workflows: ["Update CSVs to GH Pages"] # Must match exactly the name of your CSV workflow
-    types:
-      - completed
+  push:
+    branches:
+      - main # change if your production branch is different
 
 permissions:
   contents: write
@@ -50,34 +13,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Optional: Ensure CSVs and files.json are present before build
-      - name: Copy CSVs & generate files.json
-        run: |
-          mkdir -p public/api/sharepoint
-          # Copy CSVs from main branch (already fetched by workflow)
-          cp -r $GITHUB_WORKSPACE/public/api/sharepoint/* public/api/sharepoint/
-          # Generate files.json
-          node generate-files.js
-
-      # 5️⃣ Build project
       - name: Build project
         run: npm run build
 
-      # 6️⃣ Deploy build to gh-pages
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
