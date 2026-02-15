@@ -51,7 +51,6 @@ const Dashboard = ({ user, onLogout }) => {
   );
   const [selectedRampYear, setSelectedRampYear] = React.useState(null);
   const [selectedQuarter, setSelectedQuarter] = React.useState("All Months");
-  //const [quarterChangedByUser, setQuarterChangedByUser] = React.useState(false);
   const [quarterChangedByUser, setQuarterChangedByUser] = useState({});
 
   // For TrendView1 interactive legend
@@ -61,19 +60,25 @@ const Dashboard = ({ user, onLogout }) => {
   const [showBgHC, setShowBgHC] = useState(true);
   const [stakeholderVisible, setStakeholderVisible] = useState([]);
   const [selectedFY2, setSelectedFY2] = useState(null);
-  // const [selectedQuarter, setSelectedQuarter] = React.useState("Month-wise");
 
   const [activeTrendView, setActiveTrendView] = useState("TrendView1");
   const [trendView1Layout, setTrendView1Layout] = useState("1x2"); // default for TrendView1
   const [trendView2Layout, setTrendView2Layout] = useState("1x2"); // default for TrendView2
 
-  // Detect if currently selected CSV is Ramp Down
+  // ---------- Column keys ----------
 
+  const [selectedTableYear, setSelectedTableYear] = useState(null);
+  const [showQuarterlyLoss, setShowQuarterlyLoss] = useState(true);
+  const [showMonthlyRevenue, setShowMonthlyRevenue] = useState(true);
+
+  const monthKey = "Ramp down Month"; // Correct Month column
+
+  // Detect if currently selected CSV is Ramp Down
   const chartSectionRef = React.useRef();
   const trackingPageCsvMap = useMemo(
     () => ({
-      "new-transitions": `${process.env.PUBLIC_URL}/api/sharepoint/Application_Data_Opportunity_Tracker.csv`,
-      "ramp-down-project": `${process.env.PUBLIC_URL}/api/sharepoint/Application_Data_Ramp_Down.csv`,
+      "new-transitions": `Application_Data_Opportunity_Tracker.csv`,
+      "ramp-down-project": `Application_Data_Ramp_Down.csv`,
     }),
     [],
   );
@@ -175,7 +180,7 @@ const Dashboard = ({ user, onLogout }) => {
       const totalYearly = totalAmount * 4;
 
       return [
-        { title: "Total Opportunity", value: totalOpportunity },
+        { title: "Total RampDown", value: totalOpportunity },
         { title: "Total HC", value: totalHC },
         { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
         { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
@@ -341,129 +346,10 @@ const Dashboard = ({ user, onLogout }) => {
       .catch((err) => console.error("Error loading files.json:", err));
   }, []);
 
-  // useEffect(() => {
-  //   // Initialize first Trend CSV automatically
-  //   if (!selectedTrendCsv && dynamicTrends.length > 0) {
-  //     setSelectedTrendCsv(dynamicTrends[0].file);
-  //     setSelectedTrendTitle(dynamicTrends[0].label); // ✅ Title now matches sidebar
-  //     return;
-  //   }
-
-  //   if (!selectedTrendCsv) return;
-
-  //   setLoading(true);
-  //   setShowLoader(true);
-  //   const startTime = Date.now();
-
-  //   fetch(`/${selectedTrendCsv}`)
-  //     .then((res) => res.text())
-  //     .then((csvText) => {
-  //       Papa.parse(csvText, {
-  //         header: true,
-  //         skipEmptyLines: true,
-  //         dynamicTyping: true,
-  //         complete: (results) => {
-  //           const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-  //             (h) => h.trim() !== "",
-  //           );
-
-  //           const cleanedData = results.data.map((row) => {
-  //             const newRow = {};
-  //             cleanHeaders.forEach((h) => (newRow[h] = row[h]));
-  //             return newRow;
-  //           });
-
-  //           setJsonData(cleanedData);
-  //           setHeaders(cleanHeaders);
-
-  //           const elapsed = Date.now() - startTime;
-  //           setTimeout(
-  //             () => {
-  //               setLoading(false);
-  //               setShowLoader(false);
-  //             },
-  //             Math.max(0, 1000 - elapsed),
-  //           );
-  //         },
-  //       });
-  //     })
-  //     .catch((err) => {
-  //       console.error("CSV load error:", err);
-  //       setLoading(false);
-  //       setShowLoader(false);
-  //     });
-  // }, [dynamicTrends, selectedTrendCsv]);
-
-  // useEffect(() => {
-  //   // 1️⃣ Initialize first Trend CSV automatically
-  //   if (!selectedTrendCsv && dynamicTrends.length > 0) {
-  //     setSelectedTrendCsv(dynamicTrends[0].file);
-  //     setSelectedTrendTitle(dynamicTrends[0].label); // Title now matches sidebar
-  //     return;
-  //   }
-
-  //   if (!selectedTrendCsv) return;
-
-  //   setLoading(true);
-  //   setShowLoader(true);
-  //   const startTime = Date.now();
-
-  //   // ✅ Build full CSV URL using PUBLIC_URL (works on GitHub Pages and localhost)
-  //   const csvUrl = `${process.env.PUBLIC_URL}/api/sharepoint/${selectedTrendCsv}`;
-
-  //   fetch(csvUrl)
-  //     .then((res) => {
-  //       if (!res.ok) {
-  //         throw new Error(
-  //           `Failed to fetch CSV: ${res.status} ${res.statusText}`,
-  //         );
-  //       }
-  //       return res.text();
-  //     })
-  //     .then((csvText) => {
-  //       Papa.parse(csvText, {
-  //         header: true,
-  //         skipEmptyLines: true,
-  //         dynamicTyping: true,
-  //         complete: (results) => {
-  //           const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-  //             (h) => h.trim() !== "",
-  //           );
-
-  //           const cleanedData = results.data.map((row) => {
-  //             const newRow = {};
-  //             cleanHeaders.forEach((h) => (newRow[h] = row[h]));
-  //             return newRow;
-  //           });
-
-  //           setJsonData(cleanedData);
-  //           setHeaders(cleanHeaders);
-
-  //           const elapsed = Date.now() - startTime;
-  //           setTimeout(
-  //             () => {
-  //               setLoading(false);
-  //               setShowLoader(false);
-  //             },
-  //             Math.max(0, 1000 - elapsed),
-  //           );
-  //         },
-  //         error: (err) => {
-  //           console.error("Papa parse error:", err);
-  //           setLoading(false);
-  //           setShowLoader(false);
-  //         },
-  //       });
-  //     })
-  //     .catch((err) => {
-  //       console.error("CSV load error:", err, "URL:", csvUrl);
-  //       setLoading(false);
-  //       setShowLoader(false);
-  //     });
-  // }, [dynamicTrends, selectedTrendCsv]);
   useEffect(() => {
     // 1️⃣ Initialize first Trend CSV automatically
     if (!selectedTrendCsv && dynamicTrends.length > 0) {
+      console.log("Initializing first trend CSV:", dynamicTrends[0].file);
       setSelectedTrendCsv(dynamicTrends[0].file);
       setSelectedTrendTitle(dynamicTrends[0].label);
       return;
@@ -475,9 +361,35 @@ const Dashboard = ({ user, onLogout }) => {
     setShowLoader(true);
     const startTime = Date.now();
 
-    // ✅ Build CSV URL for GitHub Pages / local
-    const csvUrl = `${process.env.PUBLIC_URL}/api/sharepoint/${encodeURIComponent(selectedTrendCsv)}`;
+    // ---------------- Determine environment ----------------
+    const isGitHub = window.location.hostname.includes("github.io");
 
+    // ---------------- Base CSV path ----------------
+    // Local dev: files in public/api/sharepoint/
+    // GitHub: files directly in public/
+    const csvBasePath = isGitHub ? "" : "/api/sharepoint";
+
+    // ---------------- URL Mapping (if needed) ----------------
+    // Only needed if selectedTrendCsv still has old SharePoint-style paths
+    const urlMap = {
+      "Oppurtunity_Tracker/FY25/Month/Jan/Application Data_Opportunity Tracker.csv":
+        "Application_Data_Opportunity_Tracker.csv",
+      "Oppurtunity_Tracker/FY25/Month/Jan/Ramp_Down_Tracker.csv":
+        "Application_Data_Ramp_Down.csv",
+    };
+
+    const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
+
+    // ---------------- Final fetch URL ----------------
+    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}`;
+
+    // ---------- Console logs for debugging ----------
+    console.log("Environment:", isGitHub ? "GitHub Pages" : "Local dev");
+    console.log("Selected CSV:", selectedTrendCsv);
+    console.log("Mapped CSV file:", mappedFile);
+    console.log("Final fetch URL:", csvUrl);
+
+    // ---------------- Fetch CSV ----------------
     fetch(csvUrl)
       .then((res) => {
         if (!res.ok) {
@@ -489,7 +401,7 @@ const Dashboard = ({ user, onLogout }) => {
       })
       .then((csvText) => {
         if (!csvText || csvText.trim() === "") {
-          console.warn("CSV is empty:", selectedTrendCsv);
+          console.warn("CSV is empty:", mappedFile);
           setJsonData([]);
           setHeaders([]);
           setLoading(false);
@@ -497,6 +409,7 @@ const Dashboard = ({ user, onLogout }) => {
           return;
         }
 
+        // ---------------- Parse CSV ----------------
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
@@ -544,6 +457,7 @@ const Dashboard = ({ user, onLogout }) => {
         setShowLoader(false);
       });
   }, [dynamicTrends, selectedTrendCsv]);
+
   const formatUSD = (val) => {
     if (val >= 1e6) return `$${(val / 1e6).toFixed(1)} M`;
     if (val >= 1e3) return `$${(val / 1e3).toFixed(1)} K`;
@@ -634,27 +548,6 @@ const Dashboard = ({ user, onLogout }) => {
       }
     });
 
-    // Aggregate TrendView2 data
-    // const aggregateRampDown = (key) => {
-    //   if (!key || !filteredData.length)
-    //     return { "No Data": { hc: 0, quarterlyLoss: 0, monthlyRev: 0 } };
-
-    //   const result = {};
-    //   filteredData.forEach((row) => {
-    //     const k = row[key] || "Unknown";
-    //     if (!result[k]) result[k] = { hc: 0, quarterlyLoss: 0, monthlyRev: 0 };
-
-    //     result[k].hc += safeNumber(row[hcBillableKey]);
-    //     result[k].quarterlyLoss += safeNumber(row[quarterlyLossKey]);
-    //     result[k].monthlyRev += safeNumber(row[monthlyRevenueKey]);
-    //   });
-
-    //   return result;
-    // };
-
-    // Aggregate data by month
-    // Aggregate data by Ramp Down Month
-    // Find the Ramp Down Month column dynamically
     const rampDownMonthKey = headers.find((h) =>
       h.toLowerCase().includes("ramp down month"),
     );
@@ -1273,6 +1166,404 @@ const Dashboard = ({ user, onLogout }) => {
             quarterlyLossKey &&
             monthlyRevenueKey &&
             (() => {
+              // 2️⃣ Compute years for dropdown from your data
+              const tableYearsOptions = [
+                ...new Set(
+                  filteredData
+                    .map((row) => {
+                      const monthRaw = row[rampDownMonthKey]; // e.g., "Jan-25"
+                      if (!monthRaw) return null;
+                      return parseInt(monthRaw.split("-")[1], 10) + 2000;
+                    })
+                    .filter(Boolean),
+                ),
+              ].sort((a, b) => a - b);
+
+              // 3️⃣ Filter table data based on selected year
+              const tableFilteredData = selectedTableYear
+                ? filteredData.filter((row) => {
+                    const monthRaw = row[rampDownMonthKey];
+                    if (!monthRaw) return false;
+                    const year = parseInt(monthRaw.split("-")[1], 10) + 2000;
+                    return year === selectedTableYear;
+                  })
+                : filteredData;
+
+              // 4️⃣ Calculate dynamic column widths
+              const fixedFirstColumnWidth = 15; // % for first column
+              const baseColumns = 2; // Owner + HC always visible after first
+              const extraColumns =
+                (showQuarterlyLoss ? 1 : 0) + (showMonthlyRevenue ? 1 : 0);
+              const remainingColumns = baseColumns + extraColumns;
+              const remainingWidth = 100 - fixedFirstColumnWidth;
+              const otherColumnWidth = `${remainingWidth / remainingColumns}%`; // divide remaining equally
+
+              // 5️⃣ Render table card
+              const combinedTableCard = (
+                <div className="chart-card" style={{ padding: 20 }}>
+                  <h3 style={{ marginBottom: 12, color: "#333" }}>
+                    Total RampDown
+                  </h3>
+
+                  {/* Year dropdown and Column toggle */}
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      display: "flex",
+                      gap: 20,
+                      alignItems: "center",
+                    }}
+                  >
+                    <div>
+                      <label style={{ marginRight: 8 }}>Select Year:</label>
+                      <select
+                        value={selectedTableYear || ""}
+                        onChange={(e) =>
+                          setSelectedTableYear(
+                            e.target.value
+                              ? parseInt(e.target.value, 10)
+                              : null,
+                          )
+                        }
+                        style={{ padding: "4px 8px", fontSize: 14 }}
+                      >
+                        <option value="">All Years</option>
+                        {tableYearsOptions.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Column show/hide dropdown */}
+                    <div>
+                      <label style={{ marginRight: 8 }}>Show Column:</label>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === "quarterlyLoss")
+                            setShowQuarterlyLoss(!showQuarterlyLoss);
+                          if (value === "monthlyRevenue")
+                            setShowMonthlyRevenue(!showMonthlyRevenue);
+                        }}
+                        style={{ padding: "4px 8px", fontSize: 14 }}
+                      >
+                        <option value="">Select Column</option>
+                        <option value="quarterlyLoss">
+                          {showQuarterlyLoss
+                            ? "Hide Quarterly Loss"
+                            : "Show Quarterly Loss"}
+                        </option>
+                        <option value="monthlyRevenue">
+                          {showMonthlyRevenue
+                            ? "Hide Monthly Revenue"
+                            : "Show Monthly Revenue"}
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "14px",
+                      tableLayout: "fixed", // ensures equal width division for remaining columns
+                    }}
+                  >
+                    <thead>
+                      <tr
+                        style={{ backgroundColor: "#1e3a8a", color: "white" }}
+                      >
+                        <th
+                          style={{
+                            padding: 8,
+                            textAlign: "left",
+                            width: `${fixedFirstColumnWidth}%`,
+                          }}
+                        >
+                          Quarter
+                        </th>
+                        <th
+                          style={{
+                            padding: 8,
+                            textAlign: "left",
+                            width: otherColumnWidth,
+                          }}
+                        >
+                          Owner
+                        </th>
+                        <th
+                          style={{
+                            padding: 8,
+                            textAlign: "left",
+                            width: otherColumnWidth,
+                          }}
+                        >
+                          HC (Billable Only)
+                        </th>
+                        {showQuarterlyLoss && (
+                          <th
+                            style={{
+                              padding: 8,
+                              textAlign: "left",
+                              width: otherColumnWidth,
+                            }}
+                          >
+                            Quarterly Revenue Loss (USD)
+                          </th>
+                        )}
+                        {showMonthlyRevenue && (
+                          <th
+                            style={{
+                              padding: 8,
+                              textAlign: "left",
+                              width: otherColumnWidth,
+                            }}
+                          >
+                            Monthly Revenue (USD)
+                          </th>
+                        )}
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {["Q1", "Q2", "Q3", "Q4"].map((quarter) => {
+                        const uniqueOwners = [
+                          ...new Set(tableFilteredData.map((row) => row.Owner)),
+                        ];
+
+                        const ownerRows = uniqueOwners.map((owner) => {
+                          const ownerQuarterData = tableFilteredData.filter(
+                            (row) => {
+                              if (row.Owner !== owner) return false;
+                              const monthVal = row[monthKey];
+                              if (!monthVal) return false;
+                              const month =
+                                new Date(`1-${monthVal}`).getMonth() + 1;
+                              const rowQuarter =
+                                month >= 1 && month <= 3
+                                  ? "Q1"
+                                  : month >= 4 && month <= 6
+                                    ? "Q2"
+                                    : month >= 7 && month <= 9
+                                      ? "Q3"
+                                      : "Q4";
+                              return rowQuarter === quarter;
+                            },
+                          );
+
+                          const totalHC = ownerQuarterData.reduce(
+                            (sum, row) => sum + safeNumber(row[hcBillableKey]),
+                            0,
+                          );
+
+                          const totalQuarterlyLoss = ownerQuarterData
+                            .reduce(
+                              (sum, row) =>
+                                sum + safeNumber(row[quarterlyLossKey]),
+                              0,
+                            )
+                            .toFixed(2);
+
+                          const totalMonthlyRevenue = ownerQuarterData
+                            .reduce(
+                              (sum, row) =>
+                                sum + safeNumber(row[monthlyRevenueKey]),
+                              0,
+                            )
+                            .toFixed(2);
+
+                          return {
+                            owner,
+                            hc: totalHC || 0,
+                            quarterlyLoss: totalQuarterlyLoss || "0.00",
+                            monthlyRevenue: totalMonthlyRevenue || "0.00",
+                          };
+                        });
+
+                        const quarterTotalHC = ownerRows.reduce(
+                          (sum, row) => sum + row.hc,
+                          0,
+                        );
+                        const quarterTotalLoss = ownerRows
+                          .reduce(
+                            (sum, row) => sum + parseFloat(row.quarterlyLoss),
+                            0,
+                          )
+                          .toFixed(2);
+                        const quarterTotalMonthlyRevenue = ownerRows
+                          .reduce(
+                            (sum, row) => sum + parseFloat(row.monthlyRevenue),
+                            0,
+                          )
+                          .toFixed(2);
+
+                        return (
+                          <React.Fragment key={quarter}>
+                            {/* Quarter subtotal row */}
+                            <tr
+                              style={{
+                                backgroundColor: "#e0f2fe",
+                                fontWeight: "bold",
+                                textAlign: "left",
+                              }}
+                            >
+                              <td
+                                style={{
+                                  padding: 8,
+                                  width: `${fixedFirstColumnWidth}%`,
+                                }}
+                              >
+                                {quarter}
+                              </td>
+                              <td
+                                style={{ padding: 8, width: otherColumnWidth }}
+                              >
+                                --
+                              </td>
+                              <td
+                                style={{ padding: 8, width: otherColumnWidth }}
+                              >
+                                {quarterTotalHC}
+                              </td>
+                              {showQuarterlyLoss && (
+                                <td
+                                  style={{
+                                    padding: 8,
+                                    width: otherColumnWidth,
+                                  }}
+                                >
+                                  {quarterTotalLoss}
+                                </td>
+                              )}
+                              {showMonthlyRevenue && (
+                                <td
+                                  style={{
+                                    padding: 8,
+                                    width: otherColumnWidth,
+                                  }}
+                                >
+                                  {quarterTotalMonthlyRevenue}
+                                </td>
+                              )}
+                            </tr>
+
+                            {/* Owner rows */}
+                            {ownerRows.map((row, idx) => (
+                              <tr
+                                key={`${quarter}-owner-${idx}`}
+                                style={{
+                                  backgroundColor:
+                                    idx % 2 === 0 ? "#ffffff" : "#f9fafb",
+                                  textAlign: "left",
+                                }}
+                              >
+                                <td
+                                  style={{
+                                    padding: 8,
+                                    width: `${fixedFirstColumnWidth}%`,
+                                  }}
+                                ></td>
+                                <td
+                                  style={{
+                                    padding: 8,
+                                    width: otherColumnWidth,
+                                  }}
+                                >
+                                  {row.owner}
+                                </td>
+                                <td
+                                  style={{
+                                    padding: 8,
+                                    width: otherColumnWidth,
+                                  }}
+                                >
+                                  {row.hc}
+                                </td>
+                                {showQuarterlyLoss && (
+                                  <td
+                                    style={{
+                                      padding: 8,
+                                      width: otherColumnWidth,
+                                    }}
+                                  >
+                                    {row.quarterlyLoss}
+                                  </td>
+                                )}
+                                {showMonthlyRevenue && (
+                                  <td
+                                    style={{
+                                      padding: 8,
+                                      width: otherColumnWidth,
+                                    }}
+                                  >
+                                    {row.monthlyRevenue}
+                                  </td>
+                                )}
+                              </tr>
+                            ))}
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {/* Grand total row */}
+                      <tr
+                        style={{
+                          backgroundColor: "#1e3a8a",
+                          color: "white",
+                          fontWeight: "bold",
+                          textAlign: "left",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: 8,
+                            width: `${fixedFirstColumnWidth}%`,
+                          }}
+                        >
+                          Grand Total
+                        </td>
+                        <td style={{ padding: 8, width: otherColumnWidth }}>
+                          --
+                        </td>
+                        <td style={{ padding: 8, width: otherColumnWidth }}>
+                          {tableFilteredData.reduce(
+                            (sum, row) => sum + safeNumber(row[hcBillableKey]),
+                            0,
+                          )}
+                        </td>
+                        {showQuarterlyLoss && (
+                          <td style={{ padding: 8, width: otherColumnWidth }}>
+                            {tableFilteredData
+                              .reduce(
+                                (sum, row) =>
+                                  sum + safeNumber(row[quarterlyLossKey]),
+                                0,
+                              )
+                              .toFixed(2)}
+                          </td>
+                        )}
+                        {showMonthlyRevenue && (
+                          <td style={{ padding: 8, width: otherColumnWidth }}>
+                            {tableFilteredData
+                              .reduce(
+                                (sum, row) =>
+                                  sum + safeNumber(row[monthlyRevenueKey]),
+                                0,
+                              )
+                              .toFixed(2)}
+                          </td>
+                        )}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              );
+
               const rampCharts = [
                 { title: "Project-wise Ramp Down", key: projectKey },
                 { title: "Process-wise Ramp Down", key: processKey },
@@ -1310,7 +1601,7 @@ const Dashboard = ({ user, onLogout }) => {
               ];
               const quarterOrder = ["Q1", "Q2", "Q3", "Q4"];
 
-              // ---------- Aggregate data ----------
+              // ---------- Aggregate ramp data ----------
               const rampData = rampCharts
                 .map(({ title, key }) => {
                   const rampDataByMonth = {};
@@ -1319,7 +1610,6 @@ const Dashboard = ({ user, onLogout }) => {
                   filteredData.forEach((row) => {
                     const monthRaw = row[rampDownMonthKey];
                     if (!monthRaw) return;
-
                     const [monthName, yearPart] = monthRaw.split("-");
                     const yearFull = parseInt(yearPart, 10) + 2000;
                     const quarter = monthToQuarter[monthName] || "Unknown";
@@ -1362,8 +1652,8 @@ const Dashboard = ({ user, onLogout }) => {
                 );
               }
 
-              // ---------- Render charts ----------
-              return rampData.map(
+              // ---------- Render Ramp Down charts ----------
+              const rampChartsRendered = rampData.map(
                 ({ title, rampDataByMonth, rampDataByQuarter }, chartIndex) => {
                   if (!rampChartRefs.current[chartIndex])
                     rampChartRefs.current[chartIndex] = React.createRef();
@@ -1375,7 +1665,6 @@ const Dashboard = ({ user, onLogout }) => {
                     ),
                   ].sort((a, b) => a - b);
 
-                  // ---------- Validation ----------
                   // ---------- Validation ----------
                   if (
                     quarterChangedByUser[title] &&
@@ -1389,7 +1678,6 @@ const Dashboard = ({ user, onLogout }) => {
                         style={{ padding: 20 }}
                       >
                         <h3>{title}</h3>
-
                         <select
                           value={selectedRampYear || ""}
                           onChange={(e) =>
@@ -1413,7 +1701,6 @@ const Dashboard = ({ user, onLogout }) => {
                             </option>
                           ))}
                         </select>
-
                         <p style={{ color: "red", marginTop: 8 }}>
                           Please select a year from the dropdown to view the
                           chart.
@@ -1513,7 +1800,6 @@ const Dashboard = ({ user, onLogout }) => {
                     const updatedAll = [...rampActiveDatasets];
                     updatedAll[chartIndex] = newActive;
                     setRampActiveDatasets(updatedAll);
-
                     const chart = rampChartRefs.current[chartIndex].current;
                     if (chart) {
                       chart.data.datasets[i].hidden = !newActive[i];
@@ -1521,7 +1807,7 @@ const Dashboard = ({ user, onLogout }) => {
                     }
                   };
 
-                  // ---------- Render ----------
+                  // ---------- Render Chart ----------
                   return (
                     <div className="chart-card large-chart" key={title}>
                       <h3>{title}</h3>
@@ -1556,8 +1842,6 @@ const Dashboard = ({ user, onLogout }) => {
                           value={selectedQuarter || "All Months"}
                           onChange={(e) => {
                             setSelectedQuarter(e.target.value);
-
-                            // 👇 make validation chart-specific using title
                             setQuarterChangedByUser((prev) => ({
                               ...prev,
                               [title]: true,
@@ -1647,14 +1931,7 @@ const Dashboard = ({ user, onLogout }) => {
                           options={{
                             responsive: true,
                             maintainAspectRatio: false,
-                            layout: {
-                              padding: {
-                                top: 15,
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                              },
-                            },
+                            layout: { padding: { top: 15 } },
                             plugins: {
                               legend: { display: false },
                               datalabels: {
@@ -1688,6 +1965,14 @@ const Dashboard = ({ user, onLogout }) => {
                     </div>
                   );
                 },
+              );
+
+              // ---------- Return all Ramp charts + new table ----------
+              return (
+                <>
+                  {combinedTableCard}
+                  {rampChartsRendered}
+                </>
               );
             })()}
         </div>
