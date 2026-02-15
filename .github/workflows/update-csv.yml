@@ -1,6 +1,6 @@
 name: Update CSVs to GH Pages
 
-# Trigger manually or schedule
+# Trigger manually or on schedule
 on:
   workflow_dispatch: # manual trigger
   schedule:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
