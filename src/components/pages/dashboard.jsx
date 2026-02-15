@@ -2077,19 +2077,47 @@ const Dashboard = ({ user, onLogout }) => {
               : pageTitles[activePage]}
           </h2>
           {activePage === "trends" && (
-            <div
-              style={{
-                marginBottom: 20,
-                display: "flex",
-                alignItems: "center",
-              }}
-            >
-              <label htmlFor="ownerFilter">Filter by Owner: </label>
+            // <div
+            //   style={{
+            //     marginBottom: 20,
+            //     display: "flex",
+            //     alignItems: "center",
+            //   }}
+            // >
+            //   <label htmlFor="ownerFilter">Filter by Owner: </label>
+            //   <select
+            //     id="ownerFilter"
+            //     value={selectedOwner}
+            //     onChange={(e) => setSelectedOwner(e.target.value)}
+            //     style={{ padding: "5px 10px", marginLeft: 10 }}
+            //   >
+            //     {ownerList.map((owner) => (
+            //       <option key={owner} value={owner}>
+            //         {owner}
+            //       </option>
+            //     ))}
+            //   </select>
+
+            //   <select
+            //     style={{ marginLeft: 20, padding: "5px 10px" }}
+            //     onChange={(e) => handleDownloadFullSection(e.target.value)}
+            //   >
+            //     <option value="">Download As</option>
+            //     <option value="png">PNG</option>
+            //     <option value="jpg">JPG</option>
+            //   </select>
+            // </div>
+
+            <div className="owner-filter-bar">
+              <label htmlFor="ownerFilter" className="owner-label">
+                Filter by Owner:
+              </label>
+
               <select
                 id="ownerFilter"
                 value={selectedOwner}
                 onChange={(e) => setSelectedOwner(e.target.value)}
-                style={{ padding: "5px 10px", marginLeft: 10 }}
+                className="owner-select"
               >
                 {ownerList.map((owner) => (
                   <option key={owner} value={owner}>
@@ -2099,7 +2127,7 @@ const Dashboard = ({ user, onLogout }) => {
               </select>
 
               <select
-                style={{ marginLeft: 20, padding: "5px 10px" }}
+                className="download-select"
                 onChange={(e) => handleDownloadFullSection(e.target.value)}
               >
                 <option value="">Download As</option>
