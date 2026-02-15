@@ -1,0 +1,66 @@
+name: Update CSVs to GH Pages
+
+# Trigger manually or on schedule
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 * * * *" # optional: every hour
+
+jobs:
+  update-gh-pages:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout repo
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # 2️⃣ Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4️⃣ Fetch CSVs directly from SharePoint
+      - name: Fetch CSVs from SharePoint
+        run: |
+          mkdir -p public/api/sharepoint
+          # Replace the URLs below with your actual SharePoint public links
+          curl -L -o public/api/sharepoint/Application_Data_Opportunity_Tracker.csv "https://your-sharepoint-link-1"
+          curl -L -o public/api/sharepoint/Application_Data_Ramp_Down.csv "https://your-sharepoint-link-2"
+
+      # 5️⃣ Generate files.json
+      - name: Generate files.json
+        run: node generate-files.js
+
+      # 6️⃣ Checkout or create gh-pages branch
+      - name: Checkout gh-pages branch
+        run: |
+          git fetch origin gh-pages
+          git checkout gh-pages || git checkout --orphan gh-pages
+          # Clean old CSVs
+          rm -rf public/api/sharepoint/*
+          rm -f public/api/files.json
+          # Copy latest CSVs and files.json from workspace
+          cp -r $GITHUB_WORKSPACE/public/api/sharepoint/* public/api/sharepoint/
+          cp $GITHUB_WORKSPACE/public/api/files.json public/api/files.json
+          git add public/api/sharepoint/* public/api/files.json
+
+      # 7️⃣ Commit & push if there are changes
+      - name: Commit and Push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then
+            echo "No changes detected, skipping commit"
+          else
+            git commit -m "Auto-update CSVs and files.json from SharePoint"
+            git push origin gh-pages
