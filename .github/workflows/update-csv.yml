@@ -1,61 +1,52 @@
 name: Update CSVs to GH Pages
 
-# Trigger manually or on push to main
+# Trigger manually or schedule
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+  workflow_dispatch: # manual trigger
+  schedule:
+    - cron: "0 * * * *" # optional: every hour, adjust as needed
 
 jobs:
-  update-gh-pages:
+  update-csv:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout main branch
-      - name: Checkout main
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      # 1️⃣ Checkout the repo
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       # 2️⃣ Setup Node.js
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: 18
 
-      # 3️⃣ Install dependencies (needed for generate-files.js)
-      - name: Install dependencies
-        run: npm ci
+      # 3️⃣ Create folder for CSVs
+      - name: Create CSV folder
+        run: mkdir -p public/api/sharepoint
 
-      # 4️⃣ Generate files.json from main CSVs
-      - name: Generate files.json
-        run: node generate-files.js
-
-      # 5️⃣ Switch to gh-pages branch
-      - name: Checkout or create gh-pages branch
+      # 4️⃣ Download CSVs from SharePoint
+      - name: Download CSVs
         run: |
-          git fetch origin gh-pages
-          git checkout gh-pages || git checkout --orphan gh-pages
-          # Clean old CSVs and files.json
-          rm -rf public/api/sharepoint/*
-          rm -f public/api/files.json
-          # Ensure path exists
-          mkdir -p public/api/sharepoint
-          # Copy new CSVs and files.json from main
-          cp -r $GITHUB_WORKSPACE/public/api/sharepoint/* public/api/sharepoint/
-          cp $GITHUB_WORKSPACE/public/api/files.json public/api/files.json
-          git add public/api/sharepoint/* public/api/files.json
+          curl -L -o public/api/sharepoint/Application_Data_Opportunity_Tracker.csv "https://fujitsu.sharepoint.com/:f:/r/teams/IN-efe0cf54/Shared%20Documents/General/GSS%20Dashboard/FY%2025-26/Demand%20Tracker_New%20Transitions/Application_Data_Opportunity_Tracker.csv?csf=1&web=1&e=v96yWa"
+          curl -L -o public/api/sharepoint/Application_Data_Ramp_Down.csv "https://fujitsu.sharepoint.com/:f:/r/teams/IN-efe0cf54/Shared%20Documents/General/GSS%20Dashboard/FY%2025-26/Ramp%20Down%20Tracker/Application_Data_Ramp_Down.csv?csf=1&web=1&e=v96yWa"
 
-      # 6️⃣ Commit & push changes
+      # 5️⃣ Generate files.json
+      - name: Generate files.json
+        run: |
+          cd public/api
+          echo '{"files": ["Application_Data_Opportunity_Tracker.csv","Application_Data_Ramp_Down.csv"]}' > files.json
+
+      # 6️⃣ Commit and push CSVs + files.json
       - name: Commit and push
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/api/sharepoint/* public/api/files.json
           if git diff --cached --quiet; then
             echo "No changes detected, skipping commit"
           else
-            git commit -m "Auto-update CSVs and files.json from main"
-            git push origin gh-pages
+            git commit -m "Auto-update CSVs and files.json from SharePoint"
+            git push origin main
