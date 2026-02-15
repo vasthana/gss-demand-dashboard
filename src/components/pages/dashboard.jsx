@@ -101,8 +101,24 @@ const Dashboard = ({ user, onLogout }) => {
     [],
   );
 
-  // ================== DYNAMIC TREND NAVIGATION ==================
-  // based on CSVs selected by user at login
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+
+      // 🔴 FORCE BOTH layouts when mobile
+      if (mobile) {
+        setTrendView1Layout("3x1");
+        setTrendView2Layout("3x1");
+      }
+    };
+
+    handleResize(); // run on load
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // ================= DOWNLOAD SECTION =================
   const handleDownloadFullSection = async (type) => {
@@ -577,7 +593,7 @@ const Dashboard = ({ user, onLogout }) => {
     return (
       <>
         {/* ---------- TrendView1 Layout Dropdown ---------- */}
-        {activeTrendView === "TrendView1" && (
+        {activeTrendView === "TrendView1" && !isMobile && (
           <div
             style={{ marginBottom: 20, display: "flex", alignItems: "center" }}
           >
@@ -596,7 +612,7 @@ const Dashboard = ({ user, onLogout }) => {
         )}
 
         {/* ---------- TrendView2 Layout Dropdown ---------- */}
-        {activeTrendView === "TrendView2" && (
+        {activeTrendView === "TrendView2" && !isMobile && (
           <div
             style={{ marginBottom: 20, display: "flex", alignItems: "center" }}
           >
@@ -1983,7 +1999,7 @@ const Dashboard = ({ user, onLogout }) => {
   return (
     <div className="dashboard-container">
       <div className="topbar">
-        <div className="logo">📊 Opportunity Tracker</div>
+        <div className="logo">DashBoard</div>
         <div className="topbar-right">
           <span>
             {user?.Name} ({user?.Role})
