@@ -138,7 +138,12 @@ name: Deploy React App to GitHub Pages
 on:
   schedule:
     - cron: "*/15 * * * *" # Automatic run every 15 minutes for CSV updates
-  workflow_dispatch: # Manual trigger (can be used for JSX/JS build)
+  workflow_dispatch: # Manual trigger for JSX build or CSV test
+    inputs:
+      test_csv:
+        description: "Set to true to test CSV update immediately"
+        required: false
+        default: "false"
   push:
     branches:
       - main
@@ -147,23 +152,46 @@ permissions:
   contents: write
 
 jobs:
-  # ----------------------------------------
-  # CSV Auto-Update Job
-  # ----------------------------------------
-  csv-deploy:
+  build-and-deploy:
     runs-on: self-hosted
     steps:
+      # ----------------------------------------
       # 1️⃣ Checkout repository
+      # ----------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js (needed only if you later build JSX)
+      # ----------------------------------------
+      # 2️⃣ Setup Node.js
+      # ----------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Copy CSVs & generate files.json
+      # ----------------------------------------
+      # 3️⃣ Detect if JSX/JS files changed or test CSV run
+      # ----------------------------------------
+      - name: Check for CSV vs JSX changes
+        id: check_changes
+        run: |
+          git fetch origin main
+          CHANGED=$(git diff --name-only origin/main)
+          echo "Changed files in last commit: $CHANGED"
+          # If any non-CSV file changed, set build_needed=true
+          if [[ "${{ github.event.inputs.test_csv }}" == "true" ]]; then
+            echo "Test CSV run: build not needed" 
+            echo "build_needed=false" >> $GITHUB_ENV
+          elif echo "$CHANGED" | grep -qvE '\.csv$'; then
+            echo "Non-CSV changes detected. Build needed."
+            echo "build_needed=true" >> $GITHUB_ENV
+          else
+            echo "Only CSV changes detected. Build not needed."
+            echo "build_needed=false" >> $GITHUB_ENV
+
+      # ----------------------------------------
+      # 4️⃣ Copy CSVs & generate files.json
+      # ----------------------------------------
       - name: Update CSVs from OneDrive & generate files.json
         shell: powershell
         run: |
@@ -182,38 +210,22 @@ jobs:
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
           $json | Out-File build/api/files.json -Encoding utf8
 
-      # 4️⃣ Deploy CSV changes (no rebuild)
-      - name: Deploy CSV changes
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
-          keep_files: true # ⚡ Only updates CSVs, keeps existing build intact
-
-  # ----------------------------------------
-  # Optional Full Build Job (Manual / JSX changes)
-  # ----------------------------------------
-  build-and-deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    runs-on: self-hosted
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      # Comment: rebuild start if we are changing JSX/JS files
-      - name: Install dependencies
-        run: npm install
-
+      # ----------------------------------------
+      # 5️⃣ Build React app (only for JSX/JS changes)
+      # ----------------------------------------
       - name: Build project (for JSX/JS changes)
-        run: npm run build
+        if: env.build_needed == 'true'
+        run: |
+          echo "Non-CSV changes detected. Running full build..."
+          npm install
+          npm run build
 
-      - name: Deploy full build
+      # ----------------------------------------
+      # 6️⃣ Deploy to gh-pages (always runs)
+      # ----------------------------------------
+      - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
+          keep_files: true # ⚡ Only updates changed files (CSV or build)
