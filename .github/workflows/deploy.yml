@@ -36,23 +36,26 @@
 name: Deploy React App to GitHub Pages
 
 on:
+  schedule:
+    - cron: "*/15 * * * *" # run every 15 minutes automatically
+  workflow_dispatch: # allow manual run button
   push:
     branches:
-      - main # Trigger on main branch changes
+      - main # optional: still deploy when code changes
 
 permissions:
   contents: write
 
 jobs:
   build-and-deploy:
-    runs-on: self-hosted # Must be a runner with access to the synced OneDrive folder
+    runs-on: self-hosted
 
     steps:
       # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Setup Node
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -62,33 +65,28 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Copy CSVs from OneDrive and dynamically generate files.json
+      # 4️⃣ Copy CSVs + generate files.json (WINDOWS SAFE)
       - name: Update CSVs from OneDrive & generate files.json
+        shell: powershell
         run: |
-          ONEDRIVE_PATH="D:/One drive/OneDrive - FUJITSU/IN - OneAsia1 BPS PM - FY 25-26"
+          $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
 
-          # Ensure destination folder exists
-          mkdir -p public/api/sharepoint
+          # Ensure destination exists
+          New-Item -ItemType Directory -Force -Path public/api/sharepoint | Out-Null
 
-          # Copy CSVs from OneDrive to public/api/sharepoint
-          cp -r "$ONEDRIVE_PATH/Demand Tracker_New Transitions/"*.csv public/api/sharepoint/ || true
-          cp -r "$ONEDRIVE_PATH/Ramp Down Tracker/"*.csv public/api/sharepoint/ || true
+          # Copy CSV files (ignore if none)
+          Copy-Item "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv" public/api/sharepoint -ErrorAction SilentlyContinue
+          Copy-Item "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv" public/api/sharepoint -ErrorAction SilentlyContinue
 
-          # Dynamically generate files.json
-          cd public/api
-          echo '{"files": [' > files.json
-          first=true
-          for f in sharepoint/*.csv; do
-            if [ "$first" = true ]; then
-              echo "\"$(basename "$f")\"" >> files.json
-              first=false
-            else
-              echo ", \"$(basename "$f")\"" >> files.json
-            fi
-          done
-          echo ']}' >> files.json
+          # Generate files.json dynamically
+          $files = Get-ChildItem public/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
+          $json = @{ files = $files } | ConvertTo-Json -Depth 2
+          $json | Out-File public/api/files.json -Encoding utf8
 
-      # 5️⃣ Build the project
+          Write-Host "Generated files.json:"
+          Get-Content public/api/files.json
+
+      # 5️⃣ Build React app
       - name: Build project
         run: npm run build
 
