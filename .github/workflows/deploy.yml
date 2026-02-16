@@ -170,32 +170,29 @@ jobs:
           node-version: 18
 
       # ----------------------------------------
-      # 3️⃣ Detect if JSX/JS files changed or test CSV run
+      # 3️⃣ Detect if JSX/JS files changed or test CSV run (CMD)
       # ----------------------------------------
       - name: Check for CSV vs JSX changes
-        id: check_changes
         run: |
           git fetch origin main
-          CHANGED=$(git diff --name-only origin/main)
-          echo "Changed files in last commit: $CHANGED"
-          # If any non-CSV file changed, set build_needed=true
-          if [[ "${{ github.event.inputs.test_csv }}" == "true" ]]; then
-            echo "Test CSV run: build not needed" 
-            echo "build_needed=false" >> $GITHUB_ENV
-          elif echo "$CHANGED" | grep -qvE '\.csv$'; then
-            echo "Non-CSV changes detected. Build needed."
-            echo "build_needed=true" >> $GITHUB_ENV
-          else
-            echo "Only CSV changes detected. Build not needed."
-            echo "build_needed=false" >> $GITHUB_ENV
+          set CHANGED=
+          for /f "delims=" %%i in ('git diff --name-only origin/main') do set CHANGED=%%i
+          echo Changed files: %CHANGED%
+
+          if "%GITHUB_EVENT_INPUTS_test_csv%"=="true" (
+              echo Test CSV run: build not needed
+              set build_needed=false
+          ) else (
+              echo Assuming JSX/JS changes or push changes
+              set build_needed=true
+          )
+        shell: cmd
 
       # ----------------------------------------
-      # 4️⃣ Copy CSVs & generate files.json
+      # 4️⃣ Copy CSVs & generate files.json (PowerShell)
       # ----------------------------------------
       - name: Update CSVs from OneDrive & generate files.json
-        shell: powershell
         run: |
-          # CSV automatically updated without rebuild
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
 
           # Ensure destination exists
@@ -209,6 +206,7 @@ jobs:
           $files = Get-ChildItem build/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
           $json | Out-File build/api/files.json -Encoding utf8
+        shell: powershell
 
       # ----------------------------------------
       # 5️⃣ Build React app (only for JSX/JS changes)
@@ -216,9 +214,10 @@ jobs:
       - name: Build project (for JSX/JS changes)
         if: env.build_needed == 'true'
         run: |
-          echo "Non-CSV changes detected. Running full build..."
+          echo Running full build for JSX/JS changes...
           npm install
           npm run build
+        shell: cmd
 
       # ----------------------------------------
       # 6️⃣ Deploy to gh-pages (always runs)
