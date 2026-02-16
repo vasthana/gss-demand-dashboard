@@ -137,13 +137,8 @@ name: Deploy React App to GitHub Pages
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # Automatic run every 15 minutes
-  workflow_dispatch: # Manual trigger
-    inputs:
-      test_csv:
-        description: "Set to true to test CSV update immediately"
-        required: false
-        default: "false"
+    - cron: "*/15 * * * *" # Checks every 15 minutes for CSV updates
+  workflow_dispatch: # Manual trigger for testing or JSX push
   push:
     branches:
       - main
@@ -154,6 +149,7 @@ permissions:
 jobs:
   build-and-deploy:
     runs-on: self-hosted
+
     steps:
       # ----------------------------------------
       # 1️⃣ Checkout repository
@@ -170,58 +166,87 @@ jobs:
           node-version: 18
 
       # ----------------------------------------
-      # 3️⃣ Detect if rebuild is needed (CMD)
+      # 3️⃣ Detect changes (CSV or JSX/JS) in CMD
       # ----------------------------------------
       - name: Determine if build is needed
         shell: cmd
         run: |
           git fetch origin main
-          set CHANGED=
-          for /f "delims=" %%i in ('git diff --name-only origin/main') do set CHANGED=%%i
-          echo Changed files: %CHANGED%
 
-          REM -- Always rebuild if test_csv is true, CSV changes, or JSX/JS changes
-          if "%GITHUB_EVENT_INPUTS_test_csv%"=="true" (
-              echo Test CSV run: build will run
-              set build_needed=true
+          REM -- Check if any JSX/JS files changed
+          set CHANGED_JSX=
+          for /f "delims=" %%i in ('git diff --name-only origin/main') do (
+            set CHANGED_JSX=%%i
+          )
+
+          REM -- Always rebuild for JSX/JS changes
+          if defined CHANGED_JSX (
+            echo JSX/JS changes detected
+            set build_needed=true
           ) else (
-              echo Changes detected, build will run to reflect CSV or JSX updates
-              set build_needed=true
+            echo No JSX/JS changes detected yet, will check CSV next
+            set build_needed=false
           )
 
       # ----------------------------------------
-      # 4️⃣ Copy CSVs & generate files.json (PowerShell)
+      # 4️⃣ Copy CSVs from OneDrive & check if changed
       # ----------------------------------------
-      - name: Update CSVs from OneDrive & generate files.json
+      - name: Copy CSVs & detect changes
         shell: powershell
         run: |
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
+          $DEST_PATH="public/api/sharepoint"
 
           # Ensure destination exists
-          New-Item -ItemType Directory -Force -Path build/api/sharepoint | Out-Null
+          New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
 
-          # Copy CSV files (ignore if none)
-          Copy-Item "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv" build/api/sharepoint -ErrorAction SilentlyContinue
-          Copy-Item "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv" build/api/sharepoint -ErrorAction SilentlyContinue
+          # Track CSV changes
+          $csvChanged = $false
+
+          # Copy CSVs from OneDrive
+          $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv"
+          foreach ($file in $csvFiles) {
+            $destFile = Join-Path $DEST_PATH $file.Name
+            if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
+              Copy-Item $file.FullName $destFile -Force
+              $csvChanged = $true
+            }
+          }
+
+          $csvFiles2 = Get-ChildItem "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv"
+          foreach ($file in $csvFiles2) {
+            $destFile = Join-Path $DEST_PATH $file.Name
+            if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
+              Copy-Item $file.FullName $destFile -Force
+              $csvChanged = $true
+            }
+          }
 
           # Generate files.json dynamically
-          $files = Get-ChildItem build/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
+          $files = Get-ChildItem $DEST_PATH -Filter *.csv | Select-Object -ExpandProperty Name
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
-          $json | Out-File build/api/files.json -Encoding utf8
+          $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
+
+          if ($csvChanged) {
+            Write-Host "CSV changes detected. React build will run."
+            echo "##vso[task.setvariable variable=build_needed]true"
+          } else {
+            Write-Host "No CSV changes detected."
+          }
 
       # ----------------------------------------
-      # 5️⃣ Build React app (for any CSV or JSX/JS changes)
+      # 5️⃣ Build React app (only if CSV/JSX changed)
       # ----------------------------------------
       - name: Build project
         if: env.build_needed == 'true'
         shell: cmd
         run: |
-          echo Running full build to reflect CSV/JSX changes...
+          echo Running React build due to CSV or JSX changes...
           npm install
           npm run build
 
       # ----------------------------------------
-      # 6️⃣ Deploy to gh-pages (always runs)
+      # 6️⃣ Deploy to GH Pages
       # ----------------------------------------
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
