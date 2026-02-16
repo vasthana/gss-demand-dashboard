@@ -559,99 +559,41 @@ const Dashboard = ({ user, onLogout }) => {
   useEffect(() => {
     if (!selectedTrendCsv) return;
 
+    let isMounted = true; // Prevent state updates after unmount
     setLoading(true);
     setShowLoader(true);
     const startTime = Date.now();
 
-    const isGitHub = window.location.hostname.includes("github.io");
-    const csvBasePath = isGitHub ? "" : "/api/sharepoint";
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsv}?v=${csvVersion}`;
-
-    fetch(csvUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch CSV: ${res.status}`);
-        return res.text();
-      })
-      .then((csvText) => {
-        if (!csvText || csvText.trim() === "") {
-          setJsonData([]);
-          setHeaders([]);
-          setLoading(false);
-          setShowLoader(false);
-          return;
-        }
-
-        // Parse CSV using PapaParse
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          dynamicTyping: true,
-          complete: (results) => {
-            // Clean headers
-            const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-              (h) => h && h.trim() !== "",
-            );
-
-            // Clean rows
-            const cleanedData = results.data.map((row) => {
-              const newRow = {};
-              cleanHeaders.forEach((h) => (newRow[h] = row[h]));
-              return newRow;
-            });
-
-            setJsonData(cleanedData);
-            setHeaders(cleanHeaders);
-
-            // Ensure loader shows at least 1s
-            const elapsed = Date.now() - startTime;
-            setTimeout(
-              () => {
-                setLoading(false);
-                setShowLoader(false);
-              },
-              Math.max(0, 1000 - elapsed),
-            );
-          },
-          error: (err) => {
-            console.error("Papa parse error:", err);
-            setJsonData([]);
-            setHeaders([]);
-            setLoading(false);
-            setShowLoader(false);
-          },
-        });
-      })
-      .catch((err) => {
-        console.error("CSV load error:", err, "URL:", csvUrl);
-        setJsonData([]);
-        setHeaders([]);
-        setLoading(false);
-        setShowLoader(false);
-      });
-  }, [selectedTrendCsv, csvVersion]);
-
-  useEffect(() => {
-    if (!selectedTrendCsv) return;
-
-    setLoading(true);
-    setShowLoader(true);
-    const startTime = Date.now();
+    const csvVersionLocal = csvVersion; // capture current CSV version
+    const selectedTrendCsvLocal = selectedTrendCsv; // capture current CSV
 
     const isGitHub = window.location.hostname.includes("github.io");
     const csvBasePath = isGitHub ? "" : "/api/sharepoint";
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsv}?v=${csvVersion}`;
+    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsvLocal}?v=${csvVersionLocal}`;
 
-    fetch(csvUrl)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to fetch CSV: ${res.status}`);
-        return res.text();
-      })
-      .then((csvText) => {
-        if (!csvText || csvText.trim() === "") {
-          setJsonData([]);
-          setHeaders([]);
+    const cleanupLoader = () => {
+      const elapsed = Date.now() - startTime;
+      setTimeout(
+        () => {
+          if (!isMounted) return;
           setLoading(false);
           setShowLoader(false);
+        },
+        Math.max(0, 1000 - elapsed),
+      );
+    };
+
+    const fetchCsv = async () => {
+      try {
+        const res = await fetch(csvUrl);
+        if (!res.ok) throw new Error(`Failed to fetch CSV: ${res.status}`);
+        const csvText = await res.text();
+
+        if (!csvText || csvText.trim() === "") {
+          if (!isMounted) return;
+          setJsonData([]);
+          setHeaders([]);
+          cleanupLoader();
           return;
         }
 
@@ -660,9 +602,12 @@ const Dashboard = ({ user, onLogout }) => {
           skipEmptyLines: true,
           dynamicTyping: true,
           complete: (results) => {
+            if (!isMounted) return;
+
             const cleanHeaders = Object.keys(results.data[0] || {}).filter(
               (h) => h && h.trim() !== "",
             );
+
             const cleanedData = results.data.map((row) => {
               const newRow = {};
               cleanHeaders.forEach((h) => (newRow[h] = row[h]));
@@ -671,33 +616,32 @@ const Dashboard = ({ user, onLogout }) => {
 
             setJsonData(cleanedData);
             setHeaders(cleanHeaders);
-
-            const elapsed = Date.now() - startTime;
-            setTimeout(
-              () => {
-                setLoading(false);
-                setShowLoader(false);
-              },
-              Math.max(0, 1000 - elapsed),
-            );
+            cleanupLoader();
           },
           error: (err) => {
+            if (!isMounted) return;
             console.error("Papa parse error:", err);
             setJsonData([]);
             setHeaders([]);
-            setLoading(false);
-            setShowLoader(false);
+            cleanupLoader();
           },
         });
-      })
-      .catch((err) => {
+      } catch (err) {
+        if (!isMounted) return;
         console.error("CSV load error:", err, "URL:", csvUrl);
         setJsonData([]);
         setHeaders([]);
-        setLoading(false);
-        setShowLoader(false);
-      });
+        cleanupLoader();
+      }
+    };
+
+    fetchCsv();
+
+    return () => {
+      isMounted = false; // cleanup
+    };
   }, [selectedTrendCsv, csvVersion]);
+
   const formatUSD = (val) => {
     if (val >= 1e6) return `$${(val / 1e6).toFixed(1)} M`;
     if (val >= 1e3) return `$${(val / 1e3).toFixed(1)} K`;
