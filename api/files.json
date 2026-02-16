@@ -1,6 +1,6 @@
-{
-  "files": [
-    "Application_Data_Opportunity_Tracker.csv",
-    "Application_Data_Ramp_Down.csv"
-  ]
+﻿{
+    "files":  [
+                  "Application_Data_Opportunity_Tracker.csv",
+                  "Application_Data_Ramp_Down.csv"
+              ]
 }
