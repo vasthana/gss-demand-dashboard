@@ -62,12 +62,83 @@
 #           github_token: ${{ secrets.GITHUB_TOKEN }}
 #           publish_dir: ./build
 
+# name: Deploy React App to GitHub Pages
+
+# on:
+#   schedule:
+#     - cron: "*/15 * * * *" # run every 15 minutes automatically
+#   workflow_dispatch: # manual trigger
+#   push:
+#     branches:
+#       - main
+
+# permissions:
+#   contents: write
+
+# jobs:
+#   build-and-deploy:
+#     runs-on: self-hosted
+
+#     steps:
+#       # 1️⃣ Checkout repository
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       # 2️⃣ Setup Node.js
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       # 3️⃣ Clean old build and node_modules (Windows CMD)
+#       - name: Clean build and node_modules (Windows CMD)
+#         shell: cmd
+#         run: |
+#           if exist build rmdir /s /q build
+#           if exist node_modules rmdir /s /q node_modules
+
+#       # 4️⃣ Install dependencies
+#       - name: Install dependencies
+#         run: npm install
+
+#       # 5️⃣ Copy CSVs + generate files.json (PowerShell)
+#       - name: Update CSVs from OneDrive & generate files.json
+#         shell: powershell
+#         run: |
+#           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
+
+#           # Ensure destination exists
+#           New-Item -ItemType Directory -Force -Path public/api/sharepoint | Out-Null
+
+#           # Copy CSV files (ignore if none)
+#           Copy-Item "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv" public/api/sharepoint -ErrorAction SilentlyContinue
+#           Copy-Item "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv" public/api/sharepoint -ErrorAction SilentlyContinue
+
+#           # Generate files.json dynamically
+#           $files = Get-ChildItem public/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
+#           $json = @{ files = $files } | ConvertTo-Json -Depth 2
+#           $json | Out-File public/api/files.json -Encoding utf8
+
+#           Write-Host "Generated files.json:"
+#           Get-Content public/api/files.json
+
+#       # 6️⃣ Build React app
+#       - name: Build project
+#         run: npm run build
+
+#       # 7️⃣ Deploy to gh-pages
+#       - name: Deploy to gh-pages branch
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
+
 name: Deploy React App to GitHub Pages
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # run every 15 minutes automatically
-  workflow_dispatch: # manual trigger
+    - cron: "*/15 * * * *" # Automatic run every 15 minutes for CSV updates
+  workflow_dispatch: # Manual trigger (can be used for JSX/JS build)
   push:
     branches:
       - main
@@ -76,58 +147,72 @@ permissions:
   contents: write
 
 jobs:
-  build-and-deploy:
+  # ----------------------------------------
+  # CSV Auto-Update Job
+  # ----------------------------------------
+  csv-deploy:
     runs-on: self-hosted
-
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
+      # 2️⃣ Setup Node.js (needed only if you later build JSX)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Clean old build and node_modules (Windows CMD)
-      - name: Clean build and node_modules (Windows CMD)
-        shell: cmd
-        run: |
-          if exist build rmdir /s /q build
-          if exist node_modules rmdir /s /q node_modules
-
-      # 4️⃣ Install dependencies
-      - name: Install dependencies
-        run: npm install
-
-      # 5️⃣ Copy CSVs + generate files.json (PowerShell)
+      # 3️⃣ Copy CSVs & generate files.json
       - name: Update CSVs from OneDrive & generate files.json
         shell: powershell
         run: |
+          # CSV automatically updated without rebuild
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
 
           # Ensure destination exists
-          New-Item -ItemType Directory -Force -Path public/api/sharepoint | Out-Null
+          New-Item -ItemType Directory -Force -Path build/api/sharepoint | Out-Null
 
           # Copy CSV files (ignore if none)
-          Copy-Item "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv" public/api/sharepoint -ErrorAction SilentlyContinue
-          Copy-Item "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv" public/api/sharepoint -ErrorAction SilentlyContinue
+          Copy-Item "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv" build/api/sharepoint -ErrorAction SilentlyContinue
+          Copy-Item "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv" build/api/sharepoint -ErrorAction SilentlyContinue
 
           # Generate files.json dynamically
-          $files = Get-ChildItem public/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
+          $files = Get-ChildItem build/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
-          $json | Out-File public/api/files.json -Encoding utf8
+          $json | Out-File build/api/files.json -Encoding utf8
 
-          Write-Host "Generated files.json:"
-          Get-Content public/api/files.json
+      # 4️⃣ Deploy CSV changes (no rebuild)
+      - name: Deploy CSV changes
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build
+          keep_files: true # ⚡ Only updates CSVs, keeps existing build intact
 
-      # 6️⃣ Build React app
-      - name: Build project
+  # ----------------------------------------
+  # Optional Full Build Job (Manual / JSX changes)
+  # ----------------------------------------
+  build-and-deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # Comment: rebuild start if we are changing JSX/JS files
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project (for JSX/JS changes)
         run: npm run build
 
-      # 7️⃣ Deploy to gh-pages
-      - name: Deploy to gh-pages branch
+      - name: Deploy full build
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
