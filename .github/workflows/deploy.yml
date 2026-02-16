@@ -137,8 +137,8 @@ name: Deploy React App to GitHub Pages
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # Automatic run every 15 minutes for CSV updates
-  workflow_dispatch: # Manual trigger for JSX build or CSV test
+    - cron: "*/15 * * * *" # Automatic run every 15 minutes
+  workflow_dispatch: # Manual trigger
     inputs:
       test_csv:
         description: "Set to true to test CSV update immediately"
@@ -170,28 +170,30 @@ jobs:
           node-version: 18
 
       # ----------------------------------------
-      # 3️⃣ Detect if JSX/JS files changed or test CSV run (CMD)
+      # 3️⃣ Detect if rebuild is needed (CMD)
       # ----------------------------------------
-      - name: Check for CSV vs JSX changes
+      - name: Determine if build is needed
+        shell: cmd
         run: |
           git fetch origin main
           set CHANGED=
           for /f "delims=" %%i in ('git diff --name-only origin/main') do set CHANGED=%%i
           echo Changed files: %CHANGED%
 
+          REM -- Always rebuild if test_csv is true, CSV changes, or JSX/JS changes
           if "%GITHUB_EVENT_INPUTS_test_csv%"=="true" (
-              echo Test CSV run: build not needed
-              set build_needed=false
+              echo Test CSV run: build will run
+              set build_needed=true
           ) else (
-              echo Assuming JSX/JS changes or push changes
+              echo Changes detected, build will run to reflect CSV or JSX updates
               set build_needed=true
           )
-        shell: cmd
 
       # ----------------------------------------
       # 4️⃣ Copy CSVs & generate files.json (PowerShell)
       # ----------------------------------------
       - name: Update CSVs from OneDrive & generate files.json
+        shell: powershell
         run: |
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
 
@@ -206,18 +208,17 @@ jobs:
           $files = Get-ChildItem build/api/sharepoint -Filter *.csv | Select-Object -ExpandProperty Name
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
           $json | Out-File build/api/files.json -Encoding utf8
-        shell: powershell
 
       # ----------------------------------------
-      # 5️⃣ Build React app (only for JSX/JS changes)
+      # 5️⃣ Build React app (for any CSV or JSX/JS changes)
       # ----------------------------------------
-      - name: Build project (for JSX/JS changes)
+      - name: Build project
         if: env.build_needed == 'true'
+        shell: cmd
         run: |
-          echo Running full build for JSX/JS changes...
+          echo Running full build to reflect CSV/JSX changes...
           npm install
           npm run build
-        shell: cmd
 
       # ----------------------------------------
       # 6️⃣ Deploy to gh-pages (always runs)
@@ -227,4 +228,4 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
-          keep_files: true # ⚡ Only updates changed files (CSV or build)
+          keep_files: true
