@@ -170,10 +170,45 @@ const Dashboard = ({ user, onLogout }) => {
     // =====================================================
     // 🔹 DYNAMIC TRENDS PAGE
     // =====================================================
+    // if (activePage === "trends") {
+    //   const totalOpportunity = filteredData.filter(
+    //     (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
+    //   ).length;
+
+    //   const hcKey = headers.find((h) => h.toLowerCase().includes("hc"));
+
+    //   const amountKey = headers.find(
+    //     (h) =>
+    //       h.toLowerCase().includes("amount") ||
+    //       h.toLowerCase().includes("revenue") ||
+    //       h.toLowerCase().includes("contract"),
+    //   );
+
+    //   const totalHC = hcKey
+    //     ? filteredData.reduce((sum, row) => sum + safeNumber(row[hcKey]), 0)
+    //     : 0;
+
+    //   const totalAmount = amountKey
+    //     ? filteredData.reduce((sum, row) => sum + safeNumber(row[amountKey]), 0)
+    //     : 0;
+
+    //   const totalMonthly = totalAmount / 3; // approximate
+    //   const totalYearly = totalAmount * 4;
+
+    //   return [
+    //     { title: "Total RampDown", value: totalOpportunity },
+    //     { title: "Total HC", value: totalHC },
+    //     { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
+    //     { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
+    //   ];
+    // }
+
     if (activePage === "trends") {
       const totalOpportunity = filteredData.filter(
         (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
       ).length;
+
+      const totalRampDown = filteredData.length; // or use your rampdown logic if different
 
       const hcKey = headers.find((h) => h.toLowerCase().includes("hc"));
 
@@ -192,11 +227,21 @@ const Dashboard = ({ user, onLogout }) => {
         ? filteredData.reduce((sum, row) => sum + safeNumber(row[amountKey]), 0)
         : 0;
 
-      const totalMonthly = totalAmount / 3; // approximate
+      const totalMonthly = totalAmount / 3;
       const totalYearly = totalAmount * 4;
 
+      // 👇 dynamic KPI title + value
+      // const firstKpi =
+      //   activeTrendView === "activeTrendView1"
+      //     ? { title: "Total Opportunity", value: totalOpportunity }
+      //     : { title: "Total RampDown", value: totalRampDown };
+      const firstKpi =
+        activeTrendView === "TrendView1"
+          ? { title: "Total Opportunity", value: totalOpportunity }
+          : { title: "Total RampDown", value: totalRampDown };
+
       return [
-        { title: "Total RampDown", value: totalOpportunity },
+        firstKpi,
         { title: "Total HC", value: totalHC },
         { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
         { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
@@ -276,7 +321,7 @@ const Dashboard = ({ user, onLogout }) => {
     }
 
     return [];
-  }, [filteredData, headers, activePage]);
+  }, [filteredData, headers, activePage, activeTrendView]);
 
   const areaChartData = useMemo(() => {
     if (!filteredData.length) return null;
@@ -397,7 +442,8 @@ const Dashboard = ({ user, onLogout }) => {
     const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
 
     // ---------------- Final fetch URL ----------------
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}`;
+    //const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}`;
+    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}?v=${Date.now()}`;
 
     // ---------- Console logs for debugging ----------
     console.log("Environment:", isGitHub ? "GitHub Pages" : "Local dev");
@@ -492,6 +538,29 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   // ================== TABLE ==================
+  // const renderTable = () => (
+  //   <div className="table-container">
+  //     <table>
+  //       <thead>
+  //         <tr>
+  //           {headers.map((h, i) => (
+  //             <th key={i}>{h}</th>
+  //           ))}
+  //         </tr>
+  //       </thead>
+  //       <tbody>
+  //         {filteredData.slice(0, 20).map((row, i) => (
+  //           <tr key={i}>
+  //             {headers.map((h, j) => (
+  //               <td key={j}>{row[h]}</td>
+  //             ))}
+  //           </tr>
+  //         ))}
+  //       </tbody>
+  //     </table>
+  //   </div>
+  // );
+
   const renderTable = () => (
     <div className="table-container">
       <table>
@@ -503,7 +572,7 @@ const Dashboard = ({ user, onLogout }) => {
           </tr>
         </thead>
         <tbody>
-          {filteredData.slice(0, 20).map((row, i) => (
+          {filteredData.map((row, i) => (
             <tr key={i}>
               {headers.map((h, j) => (
                 <td key={j}>{row[h]}</td>
