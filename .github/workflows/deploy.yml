@@ -2,8 +2,8 @@ name: Deploy React App to GitHub Pages
 
 on:
   schedule:
-    - cron: "*/15 * * * *" # Automatic run every 15 minutes for CSV updates
-  workflow_dispatch: # Manual trigger (can be used for JSX/JS build)
+    - cron: "*/15 * * * *" # Optional: poll every 15 minutes
+  workflow_dispatch: # manual trigger
   push:
     branches:
       - main
@@ -13,26 +13,23 @@ permissions:
 
 jobs:
   # ----------------------------------------
-  # CSV Auto-Update Job
+  # Check CSV changes job
   # ----------------------------------------
-  csv-deploy:
+  csv-check:
     runs-on: self-hosted
     outputs:
-      build_needed: ${{ steps.set_build_needed.outputs.build_needed }}
+      build_needed: ${{ steps.check_csv.outputs.build_needed }}
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js (needed only if later building JSX)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Copy CSVs & generate files.json
-      - name: Update CSVs from OneDrive & generate files.json
-        id: set_build_needed
+      - name: Check CSV changes & generate files.json
+        id: check_csv
         shell: powershell
         run: |
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
@@ -41,23 +38,15 @@ jobs:
 
           $csvChanged = $false
 
-          # Copy CSVs from Demand Tracker_New Transitions
-          $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\Demand Tracker_New Transitions\*.csv"
-          foreach ($file in $csvFiles) {
-            $destFile = Join-Path $DEST_PATH $file.Name
-            if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
-              Copy-Item $file.FullName $destFile -Force
-              $csvChanged = $true
-            }
-          }
-
-          # Copy CSVs from Ramp Down Tracker
-          $csvFiles2 = Get-ChildItem "$ONEDRIVE_PATH\Ramp Down Tracker\*.csv"
-          foreach ($file in $csvFiles2) {
-            $destFile = Join-Path $DEST_PATH $file.Name
-            if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
-              Copy-Item $file.FullName $destFile -Force
-              $csvChanged = $true
+          # Check CSVs from both folders
+          foreach ($folder in @("Demand Tracker_New Transitions","Ramp Down Tracker")) {
+            $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\$folder\*.csv"
+            foreach ($file in $csvFiles) {
+              $destFile = Join-Path $DEST_PATH $file.Name
+              if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
+                Copy-Item $file.FullName $destFile -Force
+                $csvChanged = $true
+              }
             }
           }
 
@@ -66,7 +55,7 @@ jobs:
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
           $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
 
-          # Export job output for conditional build
+          # Output whether build is needed
           if ($csvChanged) {
             Write-Host "CSV changes detected"
             echo "::set-output name=build_needed::true"
@@ -75,42 +64,29 @@ jobs:
             echo "::set-output name=build_needed::false"
           }
 
-      # 4️⃣ Deploy CSV changes (no rebuild)
-      - name: Deploy CSV changes
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./build
-          keep_files: true # ⚡ Only updates CSVs, keeps existing build intact
-
   # ----------------------------------------
-  # Full Build Job (JSX/JS changes or CSV changes)
+  # Full Build & Deploy job
   # ----------------------------------------
   build-and-deploy:
-    needs: csv-deploy
+    needs: csv-check
     runs-on: self-hosted
-    if: needs.csv-deploy.outputs.build_needed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    if: needs.csv-check.outputs.build_needed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Build project (for JSX/JS or CSV updates)
-      - name: Build project
+      - name: Build project (React + CSV updates)
         run: npm run build
 
-      # 5️⃣ Deploy full build
-      - name: Deploy full build
+      - name: Deploy to GH Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
