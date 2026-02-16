@@ -127,7 +127,7 @@ jobs:
         shell: powershell
         run: |
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
-          $DEST_PATH="public/api/sharepoint"   # ✅ changed from build/api/sharepoint
+          $DEST_PATH="public/api/sharepoint"   # ✅ copy to public so React build includes CSVs
           New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
 
           $csvChanged = $false
@@ -156,6 +156,7 @@ jobs:
           } else {
             Write-Host "No CSV changes detected"
             echo "::set-output name=build_needed::false"
+          }  # ✅ closing brace added
 
   # ----------------------------------------
   # Full Build & Deploy job
