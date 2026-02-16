@@ -1,32 +1,89 @@
+# name: Deploy React App to GitHub Pages
+
+# on:
+#   push:
+#     branches:
+#       - main # change if your production branch is different
+
+# permissions:
+#   contents: write
+
+# jobs:
+#   build-and-deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Build project
+#         run: npm run build
+
+#       - name: Deploy to gh-pages branch
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
+
 name: Deploy React App to GitHub Pages
 
 on:
   push:
     branches:
-      - main # change if your production branch is different
+      - main # Trigger on main branch changes
 
 permissions:
   contents: write
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted # Must be a runner with access to the synced OneDrive folder
 
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
+      # 4️⃣ Copy CSVs from OneDrive and generate files.json
+      - name: Update CSVs from OneDrive & generate files.json
+        run: |
+          # Path to your OneDrive-synced SharePoint folder
+          ONEDRIVE_PATH="/path/to/OneDrive/IN - OneAsia1 BPS PM - FY 25-26"
+
+          # Ensure destination folder exists
+          mkdir -p public/api/sharepoint
+
+          # Copy CSVs from OneDrive to public/api/sharepoint
+          cp -r "$ONEDRIVE_PATH/Demand Tracker_New Transitions/"*.csv public/api/sharepoint/
+          cp -r "$ONEDRIVE_PATH/Ramp Down Tracker/"*.csv public/api/sharepoint/
+
+          # Generate files.json automatically
+          cd public/api
+          echo '{"files": ["Application_Data_Opportunity_Tracker.csv","Application_Data_Ramp_Down.csv"]}' > files.json
+
+      # 5️⃣ Build the project
       - name: Build project
         run: npm run build
 
+      # 6️⃣ Deploy to gh-pages
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
