@@ -62,22 +62,31 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Copy CSVs from OneDrive and generate files.json
+      # 4️⃣ Copy CSVs from OneDrive and dynamically generate files.json
       - name: Update CSVs from OneDrive & generate files.json
         run: |
-          # Path to your OneDrive-synced SharePoint folder
-          ONEDRIVE_PATH="/path/to/OneDrive/IN - OneAsia1 BPS PM - FY 25-26"
+          ONEDRIVE_PATH="D:/One drive/OneDrive - FUJITSU/IN - OneAsia1 BPS PM - FY 25-26"
 
           # Ensure destination folder exists
           mkdir -p public/api/sharepoint
 
           # Copy CSVs from OneDrive to public/api/sharepoint
-          cp -r "$ONEDRIVE_PATH/Demand Tracker_New Transitions/"*.csv public/api/sharepoint/
-          cp -r "$ONEDRIVE_PATH/Ramp Down Tracker/"*.csv public/api/sharepoint/
+          cp -r "$ONEDRIVE_PATH/Demand Tracker_New Transitions/"*.csv public/api/sharepoint/ || true
+          cp -r "$ONEDRIVE_PATH/Ramp Down Tracker/"*.csv public/api/sharepoint/ || true
 
-          # Generate files.json automatically
+          # Dynamically generate files.json
           cd public/api
-          echo '{"files": ["Application_Data_Opportunity_Tracker.csv","Application_Data_Ramp_Down.csv"]}' > files.json
+          echo '{"files": [' > files.json
+          first=true
+          for f in sharepoint/*.csv; do
+            if [ "$first" = true ]; then
+              echo "\"$(basename "$f")\"" >> files.json
+              first=false
+            else
+              echo ", \"$(basename "$f")\"" >> files.json
+            fi
+          done
+          echo ']}' >> files.json
 
       # 5️⃣ Build the project
       - name: Build project
