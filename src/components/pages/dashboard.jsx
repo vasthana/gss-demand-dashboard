@@ -533,33 +533,34 @@ const Dashboard = ({ user, onLogout }) => {
   // }, [dynamicTrends, selectedTrendCsv]);
 
   useEffect(() => {
-    if (!selectedTrendCsv) return; // No CSV selected yet
+    if (!selectedTrendCsv) return;
 
     setLoading(true);
     setShowLoader(true);
     const startTime = Date.now();
 
-    // ---------------- Base CSV path ----------------
-    // Adjust "/data" to match where your CSVs are stored in the public folder
-    const csvBasePath = "/data";
+    const csvBasePath = "/api/sharepoint"; // matches public/api/sharepoint
+    const urlMap = {
+      "Oppurtunity_Tracker/FY25/Month/Jan/Application Data_Opportunity Tracker.csv":
+        "Application_Data_Opportunity_Tracker.csv",
+      "Oppurtunity_Tracker/FY25/Month/Jan/Ramp_Down_Tracker.csv":
+        "Ramp_Down_Tracker.csv",
+    };
+    const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
 
-    // ---------------- Cache-busted URL ----------------
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsv}?v=${Date.now()}`;
-
+    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}?v=${Date.now()}`;
     console.log("Fetching CSV:", csvUrl);
 
     fetch(csvUrl)
       .then((res) => {
-        if (!res.ok) {
+        if (!res.ok)
           throw new Error(
             `Failed to fetch CSV: ${res.status} ${res.statusText}`,
           );
-        }
         return res.text();
       })
       .then((csvText) => {
         if (!csvText || csvText.trim() === "") {
-          console.warn("CSV is empty:", selectedTrendCsv);
           setJsonData([]);
           setHeaders([]);
           setLoading(false);
@@ -567,29 +568,22 @@ const Dashboard = ({ user, onLogout }) => {
           return;
         }
 
-        // ---------------- Parse CSV ----------------
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true,
           complete: (results) => {
-            // Clean headers
             const cleanHeaders = Object.keys(results.data[0] || {}).filter(
               (h) => h && h.trim() !== "",
             );
-
-            // Clean rows
             const cleanedData = results.data.map((row) => {
               const newRow = {};
               cleanHeaders.forEach((h) => (newRow[h] = row[h]));
               return newRow;
             });
-
-            // Update state
             setJsonData(cleanedData);
             setHeaders(cleanHeaders);
 
-            // Ensure loader shows at least 1 second
             const elapsed = Date.now() - startTime;
             setTimeout(
               () => {
