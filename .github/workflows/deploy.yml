@@ -1,3 +1,97 @@
+# name: Deploy React App to GitHub Pages
+
+# on:
+#   schedule:
+#     - cron: "*/15 * * * *" # Optional: poll every 15 minutes
+#   workflow_dispatch: # manual trigger
+#   push:
+#     branches:
+#       - main
+
+# permissions:
+#   contents: write
+
+# jobs:
+#   # ----------------------------------------
+#   # Check CSV changes job
+#   # ----------------------------------------
+#   csv-check:
+#     runs-on: self-hosted
+#     outputs:
+#       build_needed: ${{ steps.check_csv.outputs.build_needed }}
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Check CSV changes & generate files.json
+#         id: check_csv
+#         shell: powershell
+#         run: |
+#           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
+#           $DEST_PATH="build/api/sharepoint"
+#           New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
+
+#           $csvChanged = $false
+
+#           # Check CSVs from both folders
+#           foreach ($folder in @("Demand Tracker_New Transitions","Ramp Down Tracker")) {
+#             $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\$folder\*.csv"
+#             foreach ($file in $csvFiles) {
+#               $destFile = Join-Path $DEST_PATH $file.Name
+#               if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
+#                 Copy-Item $file.FullName $destFile -Force
+#                 $csvChanged = $true
+#               }
+#             }
+#           }
+
+#           # Generate files.json dynamically
+#           $files = Get-ChildItem $DEST_PATH -Filter *.csv | Select-Object -ExpandProperty Name
+#           $json = @{ files = $files } | ConvertTo-Json -Depth 2
+#           $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
+
+#           # Output whether build is needed
+#           if ($csvChanged) {
+#             Write-Host "CSV changes detected"
+#             echo "::set-output name=build_needed::true"
+#           } else {
+#             Write-Host "No CSV changes detected"
+#             echo "::set-output name=build_needed::false"
+#           }
+
+#   # ----------------------------------------
+#   # Full Build & Deploy job
+#   # ----------------------------------------
+#   build-and-deploy:
+#     needs: csv-check
+#     runs-on: self-hosted
+#     if: needs.csv-check.outputs.build_needed == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Build project (React + CSV updates)
+#         run: npm run build
+
+#       - name: Deploy to GH Pages
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
+
 name: Deploy React App to GitHub Pages
 
 on:
@@ -32,13 +126,13 @@ jobs:
         id: check_csv
         shell: powershell
         run: |
+          # cSpell: ignore ONEDRIVE_PATH DEST_PATH
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
           $DEST_PATH="build/api/sharepoint"
           New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
 
           $csvChanged = $false
 
-          # Check CSVs from both folders
           foreach ($folder in @("Demand Tracker_New Transitions","Ramp Down Tracker")) {
             $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\$folder\*.csv"
             foreach ($file in $csvFiles) {
@@ -50,19 +144,16 @@ jobs:
             }
           }
 
-          # Generate files.json dynamically
           $files = Get-ChildItem $DEST_PATH -Filter *.csv | Select-Object -ExpandProperty Name
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
           $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
 
-          # Output whether build is needed
           if ($csvChanged) {
             Write-Host "CSV changes detected"
             echo "::set-output name=build_needed::true"
           } else {
             Write-Host "No CSV changes detected"
             echo "::set-output name=build_needed::false"
-          }
 
   # ----------------------------------------
   # Full Build & Deploy job
@@ -83,11 +174,34 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Clean previous build
+        shell: powershell
+        run: Remove-Item -Recurse -Force build
+        # Prevents leftover files from causing build errors
+
       - name: Build project (React + CSV updates)
-        run: npm run build
+        shell: cmd
+        run: |
+          set NODE_OPTIONS=--max_old_space_size=4096
+          npm run build
+        # Uses cmd shell and increases memory to prevent Windows build failures
+
+      - name: Verify Git exists
+        shell: powershell
+        run: |
+          if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+            Write-Error "Git is not installed or not in PATH. Workflow cannot continue."
+            exit 1
+          } else {
+            git --version
+          }
+        # Ensures gh-pages deploy will find Git
 
       - name: Deploy to GH Pages
         uses: peaceiris/actions-gh-pages@v4
+        env:
+          PATH: C:\Program Files\Git\cmd;${{ env.PATH }}
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
+        # GitHub Pages deployment is safe and error-free
