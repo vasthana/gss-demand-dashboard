@@ -36,10 +36,6 @@ ChartJS.register(
 
 const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
-  // const [dynamicTrends, setDynamicTrends] = useState<{ file: string; label: string }[]>([]);
-  // For currently selected CSV and its display label
-  const [selectedTrendCsv, setSelectedTrendCsv] = useState(null);
-  const [selectedTrendTitle, setSelectedTrendTitle] = useState("");
   const [jsonData, setJsonData] = useState([]);
   const [headers, setHeaders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -56,7 +52,7 @@ const Dashboard = ({ user, onLogout }) => {
   const [selectedRampYear, setSelectedRampYear] = React.useState(null);
   const [selectedQuarter, setSelectedQuarter] = React.useState("All Months");
   const [quarterChangedByUser, setQuarterChangedByUser] = useState({});
-  const [csvVersion, setCsvVersion] = useState(Date.now()); // cache-busting
+
   // For TrendView1 interactive legend
   const trend1ChartRef = React.createRef();
   const [trend1Visible, setTrend1Visible] = useState([true, true]);
@@ -369,7 +365,7 @@ const Dashboard = ({ user, onLogout }) => {
     return { months, hcValues, contractValues };
   }, [filteredData]);
 
-  //const [selectedTrendTitle, setSelectedTrendTitle] = useState("");
+  const [selectedTrendTitle, setSelectedTrendTitle] = useState("");
 
   const handleLogout = () => {
     if (onLogout) onLogout();
@@ -379,23 +375,16 @@ const Dashboard = ({ user, onLogout }) => {
   // ----------------- Dynamic Trend Setup -----------------
   // Update onTrendClick to receive trend type
 
-  // const dynamicTrends = useMemo(() => {
-  //   return filesList.map((file, idx) => ({
-  //     id: `trend${idx + 1}`,
-  //     label: `Trend View ${idx + 1}`, // 👈 DISPLAY NAME
-  //     file, // 👈 REAL CSV PATH (unchanged)
-  //   }));
-  // }, [filesList]);
   const dynamicTrends = useMemo(() => {
     return filesList.map((file, idx) => ({
       id: `trend${idx + 1}`,
-      label: `Trend View ${idx + 1}`, // Display name
-      file, // real CSV path
+      label: `Trend View ${idx + 1}`, // 👈 DISPLAY NAME
+      file, // 👈 REAL CSV PATH (unchanged)
     }));
   }, [filesList]);
 
   // ----------------- Selected CSV State -----------------
-  // const [selectedTrendCsv, setSelectedTrendCsv] = useState(null);
+  const [selectedTrendCsv, setSelectedTrendCsv] = useState(null);
 
   useEffect(() => {
     if (activePage === "trends") return;
@@ -418,194 +407,82 @@ const Dashboard = ({ user, onLogout }) => {
       .catch((err) => console.error("Error loading files.json:", err));
   }, []);
 
-  // useEffect(() => {
-  //   // 1️⃣ Initialize first Trend CSV automatically
-  //   if (!selectedTrendCsv && dynamicTrends.length > 0) {
-  //     console.log("Initializing first trend CSV:", dynamicTrends[0].file);
-  //     setSelectedTrendCsv(dynamicTrends[0].file);
-  //     setSelectedTrendTitle(dynamicTrends[0].label);
-  //     return;
-  //   }
-
-  //   if (!selectedTrendCsv) return;
-
-  //   setLoading(true);
-  //   setShowLoader(true);
-  //   const startTime = Date.now();
-
-  //   // ---------------- Determine environment ----------------
-  //   const isGitHub = window.location.hostname.includes("github.io");
-
-  //   // ---------------- Base CSV path ----------------
-  //   // Local dev: files in public/api/sharepoint/
-  //   // GitHub: files directly in public/
-  //   const csvBasePath = isGitHub ? "" : "/api/sharepoint";
-
-  //   // ---------------- URL Mapping (if needed) ----------------
-  //   // Only needed if selectedTrendCsv still has old SharePoint-style paths
-  //   const urlMap = {
-  //     "Oppurtunity_Tracker/FY25/Month/Jan/Application Data_Opportunity Tracker.csv":
-  //       "Application_Data_Opportunity_Tracker.csv",
-  //     "Oppurtunity_Tracker/FY25/Month/Jan/Ramp_Down_Tracker.csv":
-  //       "Application_Data_Ramp_Down.csv",
-  //   };
-
-  //   const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
-
-  //   // ---------------- Final fetch URL ----------------
-  //   //const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}`;
-  //   const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}?v=${Date.now()}`;
-
-  //   // ---------- Console logs for debugging ----------
-  //   console.log("Environment:", isGitHub ? "GitHub Pages" : "Local dev");
-  //   console.log("Selected CSV:", selectedTrendCsv);
-  //   console.log("Mapped CSV file:", mappedFile);
-  //   console.log("Final fetch URL:", csvUrl);
-
-  //   // ---------------- Fetch CSV ----------------
-  //   fetch(csvUrl)
-  //     .then((res) => {
-  //       if (!res.ok) {
-  //         throw new Error(
-  //           `Failed to fetch CSV: ${res.status} ${res.statusText}`,
-  //         );
-  //       }
-  //       return res.text();
-  //     })
-  //     .then((csvText) => {
-  //       if (!csvText || csvText.trim() === "") {
-  //         console.warn("CSV is empty:", mappedFile);
-  //         setJsonData([]);
-  //         setHeaders([]);
-  //         setLoading(false);
-  //         setShowLoader(false);
-  //         return;
-  //       }
-
-  //       // ---------------- Parse CSV ----------------
-  //       Papa.parse(csvText, {
-  //         header: true,
-  //         skipEmptyLines: true,
-  //         dynamicTyping: true,
-  //         complete: (results) => {
-  //           // ✅ Clean headers
-  //           const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-  //             (h) => h && h.trim() !== "",
-  //           );
-
-  //           // ✅ Clean rows
-  //           const cleanedData = results.data.map((row) => {
-  //             const newRow = {};
-  //             cleanHeaders.forEach((h) => (newRow[h] = row[h]));
-  //             return newRow;
-  //           });
-
-  //           setJsonData(cleanedData);
-  //           setHeaders(cleanHeaders);
-
-  //           // Ensure loader shows at least 1s
-  //           const elapsed = Date.now() - startTime;
-  //           setTimeout(
-  //             () => {
-  //               setLoading(false);
-  //               setShowLoader(false);
-  //             },
-  //             Math.max(0, 1000 - elapsed),
-  //           );
-  //         },
-  //         error: (err) => {
-  //           console.error("Papa parse error:", err);
-  //           setJsonData([]);
-  //           setHeaders([]);
-  //           setLoading(false);
-  //           setShowLoader(false);
-  //         },
-  //       });
-  //     })
-  //     .catch((err) => {
-  //       console.error("CSV load error:", err, "URL:", csvUrl);
-  //       setJsonData([]);
-  //       setHeaders([]);
-  //       setLoading(false);
-  //       setShowLoader(false);
-  //     });
-  // }, [dynamicTrends, selectedTrendCsv]);
-  // ---------------- Fetch files.json dynamically to detect CSVs ----------------
-
-  // ---------------- Fetch selected CSV whenever it or version changes ----------------
-  // ---------------- Fetch files.json dynamically to update CSV list ----------------
   useEffect(() => {
-    const filesJsonUrl = `${process.env.PUBLIC_URL}/api/files.json?v=${Date.now()}`;
+    // 1️⃣ Initialize first Trend CSV automatically
+    if (!selectedTrendCsv && dynamicTrends.length > 0) {
+      console.log("Initializing first trend CSV:", dynamicTrends[0].file);
+      setSelectedTrendCsv(dynamicTrends[0].file);
+      setSelectedTrendTitle(dynamicTrends[0].label);
+      return;
+    }
 
-    fetch(filesJsonUrl)
-      .then((res) => res.json())
-      .then((data) => {
-        // Update filesList → dynamicTrends will update automatically
-        setFilesList(data.files || []);
-
-        // Auto-select first CSV if none selected
-        if (!selectedTrendCsv && (data.files || []).length > 0) {
-          setSelectedTrendCsv(data.files[0]);
-          setSelectedTrendTitle(data.files[0].replace(/_/g, " "));
-        }
-
-        // Force CSV re-fetch for cache-busting
-        setCsvVersion(Date.now());
-      })
-      .catch((err) => console.error("Failed to fetch files.json:", err));
-  }, []);
-
-  // ---------------- Fetch selected CSV whenever selectedTrendCsv or csvVersion changes ----------------
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
     if (!selectedTrendCsv) return;
 
-    let isMounted = true;
     setLoading(true);
     setShowLoader(true);
     const startTime = Date.now();
 
+    // ---------------- Determine environment ----------------
     const isGitHub = window.location.hostname.includes("github.io");
-    const csvBasePath = isGitHub ? "" : "/api/sharepoint";
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsv}?v=${csvVersion}`;
 
-    const cleanupLoader = () => {
-      const elapsed = Date.now() - startTime;
-      setTimeout(
-        () => {
-          if (!isMounted) return;
-          setLoading(false);
-          setShowLoader(false);
-        },
-        Math.max(0, 1000 - elapsed),
-      );
+    // ---------------- Base CSV path ----------------
+    // Local dev: files in public/api/sharepoint/
+    // GitHub: files directly in public/
+    const csvBasePath = isGitHub ? "" : "/api/sharepoint";
+
+    // ---------------- URL Mapping (if needed) ----------------
+    // Only needed if selectedTrendCsv still has old SharePoint-style paths
+    const urlMap = {
+      "Oppurtunity_Tracker/FY25/Month/Jan/Application Data_Opportunity Tracker.csv":
+        "Application_Data_Opportunity_Tracker.csv",
+      "Oppurtunity_Tracker/FY25/Month/Jan/Ramp_Down_Tracker.csv":
+        "Application_Data_Ramp_Down.csv",
     };
 
-    const fetchCsv = async () => {
-      try {
-        const res = await fetch(csvUrl);
-        if (!res.ok) throw new Error(`Failed to fetch CSV: ${res.status}`);
-        const csvText = await res.text();
+    const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
 
+    // ---------------- Final fetch URL ----------------
+    //const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}`;
+    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}?v=${Date.now()}`;
+
+    // ---------- Console logs for debugging ----------
+    console.log("Environment:", isGitHub ? "GitHub Pages" : "Local dev");
+    console.log("Selected CSV:", selectedTrendCsv);
+    console.log("Mapped CSV file:", mappedFile);
+    console.log("Final fetch URL:", csvUrl);
+
+    // ---------------- Fetch CSV ----------------
+    fetch(csvUrl)
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(
+            `Failed to fetch CSV: ${res.status} ${res.statusText}`,
+          );
+        }
+        return res.text();
+      })
+      .then((csvText) => {
         if (!csvText || csvText.trim() === "") {
-          if (!isMounted) return;
+          console.warn("CSV is empty:", mappedFile);
           setJsonData([]);
           setHeaders([]);
-          cleanupLoader();
+          setLoading(false);
+          setShowLoader(false);
           return;
         }
 
+        // ---------------- Parse CSV ----------------
         Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
           dynamicTyping: true,
           complete: (results) => {
-            if (!isMounted) return;
-
+            // ✅ Clean headers
             const cleanHeaders = Object.keys(results.data[0] || {}).filter(
               (h) => h && h.trim() !== "",
             );
 
+            // ✅ Clean rows
             const cleanedData = results.data.map((row) => {
               const newRow = {};
               cleanHeaders.forEach((h) => (newRow[h] = row[h]));
@@ -614,31 +491,34 @@ const Dashboard = ({ user, onLogout }) => {
 
             setJsonData(cleanedData);
             setHeaders(cleanHeaders);
-            cleanupLoader();
+
+            // Ensure loader shows at least 1s
+            const elapsed = Date.now() - startTime;
+            setTimeout(
+              () => {
+                setLoading(false);
+                setShowLoader(false);
+              },
+              Math.max(0, 1000 - elapsed),
+            );
           },
           error: (err) => {
-            if (!isMounted) return;
             console.error("Papa parse error:", err);
             setJsonData([]);
             setHeaders([]);
-            cleanupLoader();
+            setLoading(false);
+            setShowLoader(false);
           },
         });
-      } catch (err) {
-        if (!isMounted) return;
+      })
+      .catch((err) => {
         console.error("CSV load error:", err, "URL:", csvUrl);
         setJsonData([]);
         setHeaders([]);
-        cleanupLoader();
-      }
-    };
-
-    fetchCsv();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedTrendCsv, csvVersion]);
+        setLoading(false);
+        setShowLoader(false);
+      });
+  }, [dynamicTrends, selectedTrendCsv]);
 
   const formatUSD = (val) => {
     if (val >= 1e6) return `$${(val / 1e6).toFixed(1)} M`;
