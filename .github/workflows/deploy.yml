@@ -67,7 +67,7 @@ name: Deploy React App to GitHub Pages
 on:
   schedule:
     - cron: "*/15 * * * *" # run every 15 minutes automatically
-  workflow_dispatch:
+  workflow_dispatch: # manual trigger
   push:
     branches:
       - main
@@ -80,25 +80,28 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      # 1️⃣ Checkout repo
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node
+      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
 
-      # 3️⃣ Install dependencies
+      # 3️⃣ Clean old build and node_modules (Windows CMD)
+      - name: Clean build and node_modules (Windows CMD)
+        shell: cmd
+        run: |
+          if exist build rmdir /s /q build
+          if exist node_modules rmdir /s /q node_modules
+
+      # 4️⃣ Install dependencies
       - name: Install dependencies
         run: npm install
 
-      # 4️⃣ Clean build folder (optional, safe)
-      - name: Clean build folder
-        run: rmdir /s /q build || echo "No existing build folder"
-
-      # 5️⃣ Copy CSVs + generate files.json
+      # 5️⃣ Copy CSVs + generate files.json (PowerShell)
       - name: Update CSVs from OneDrive & generate files.json
         shell: powershell
         run: |
