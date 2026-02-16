@@ -556,20 +556,18 @@ const Dashboard = ({ user, onLogout }) => {
   }, []);
 
   // ---------------- Fetch selected CSV whenever selectedTrendCsv or csvVersion changes ----------------
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!selectedTrendCsv) return;
 
-    let isMounted = true; // Prevent state updates after unmount
+    let isMounted = true;
     setLoading(true);
     setShowLoader(true);
     const startTime = Date.now();
 
-    const csvVersionLocal = csvVersion; // capture current CSV version
-    const selectedTrendCsvLocal = selectedTrendCsv; // capture current CSV
-
     const isGitHub = window.location.hostname.includes("github.io");
     const csvBasePath = isGitHub ? "" : "/api/sharepoint";
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsvLocal}?v=${csvVersionLocal}`;
+    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${selectedTrendCsv}?v=${csvVersion}`;
 
     const cleanupLoader = () => {
       const elapsed = Date.now() - startTime;
@@ -638,7 +636,7 @@ const Dashboard = ({ user, onLogout }) => {
     fetchCsv();
 
     return () => {
-      isMounted = false; // cleanup
+      isMounted = false;
     };
   }, [selectedTrendCsv, csvVersion]);
 
