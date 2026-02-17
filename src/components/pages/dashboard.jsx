@@ -69,8 +69,6 @@ const Dashboard = ({ user, onLogout }) => {
   // ---------- Column keys ----------
 
   const [selectedTableYear, setSelectedTableYear] = useState(null);
-  const [showQuarterlyLoss, setShowQuarterlyLoss] = useState(true);
-  const [showMonthlyRevenue, setShowMonthlyRevenue] = useState(true);
 
   const monthKey = "Ramp down Month"; // Correct Month column
 
@@ -83,7 +81,14 @@ const Dashboard = ({ user, onLogout }) => {
     }),
     [],
   );
-
+  const wrapCell = {
+    padding: 8,
+    border: "1px solid #999",
+    whiteSpace: "normal",
+    wordBreak: "break-word",
+    overflowWrap: "anywhere",
+    verticalAlign: "middle",
+  };
   const pageTitles = useMemo(
     () => ({
       trends: "📈 Portfolio Health",
@@ -1311,15 +1316,6 @@ const Dashboard = ({ user, onLogout }) => {
                   })
                 : filteredData;
 
-              // 4️⃣ Calculate dynamic column widths
-              const fixedFirstColumnWidth = 15; // % for first column
-              const baseColumns = 2; // Owner + HC always visible after first
-              const extraColumns =
-                (showQuarterlyLoss ? 1 : 0) + (showMonthlyRevenue ? 1 : 0);
-              const remainingColumns = baseColumns + extraColumns;
-              const remainingWidth = 100 - fixedFirstColumnWidth;
-              const otherColumnWidth = `${remainingWidth / remainingColumns}%`; // divide remaining equally
-
               // 5️⃣ Render table card
               const combinedTableCard = (
                 <div className="chart-card ppt-export" style={{ padding: 20 }}>
@@ -1357,34 +1353,6 @@ const Dashboard = ({ user, onLogout }) => {
                         ))}
                       </select>
                     </div>
-
-                    {/* Column show/hide dropdown */}
-                    <div>
-                      <label style={{ marginRight: 8 }}>Show Column:</label>
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === "quarterlyLoss")
-                            setShowQuarterlyLoss(!showQuarterlyLoss);
-                          if (value === "monthlyRevenue")
-                            setShowMonthlyRevenue(!showMonthlyRevenue);
-                        }}
-                        style={{ padding: "4px 8px", fontSize: 14 }}
-                      >
-                        <option value="">Select Column</option>
-                        <option value="quarterlyLoss">
-                          {showQuarterlyLoss
-                            ? "Hide Quarterly Loss"
-                            : "Show Quarterly Loss"}
-                        </option>
-                        <option value="monthlyRevenue">
-                          {showMonthlyRevenue
-                            ? "Hide Monthly Revenue"
-                            : "Show Monthly Revenue"}
-                        </option>
-                      </select>
-                    </div>
                   </div>
 
                   {/* Table */}
@@ -1393,294 +1361,144 @@ const Dashboard = ({ user, onLogout }) => {
                       width: "100%",
                       borderCollapse: "collapse",
                       fontSize: "14px",
-                      tableLayout: "fixed", // ensures equal width division for remaining columns
+                      tableLayout: "fixed",
                     }}
                   >
                     <thead>
+                      {/* Top header row - DARK BLUE */}
                       <tr
-                        style={{ backgroundColor: "#1e3a8a", color: "white" }}
+                        style={{
+                          backgroundColor: "rgb(30, 58, 138)",
+                          textAlign: "center",
+                        }}
                       >
                         <th
+                          rowSpan={2}
                           style={{
-                            padding: 8,
-                            textAlign: "left",
-                            width: `${fixedFirstColumnWidth}%`,
-                          }}
-                        >
-                          Quarter
-                        </th>
-                        <th
-                          style={{
-                            padding: 8,
-                            textAlign: "left",
-                            width: otherColumnWidth,
+                            ...wrapCell,
+                            color: "white",
+                            fontWeight: "bold",
                           }}
                         >
                           Owner
                         </th>
-                        <th
-                          style={{
-                            padding: 8,
-                            textAlign: "left",
-                            width: otherColumnWidth,
-                          }}
-                        >
-                          HC (Billable Only)
-                        </th>
-                        {showQuarterlyLoss && (
+
+                        {["Q1", "Q2", "Q3", "Q4"].map((q) => (
                           <th
+                            key={q}
+                            colSpan={2}
                             style={{
-                              padding: 8,
-                              textAlign: "left",
-                              width: otherColumnWidth,
+                              ...wrapCell,
+                              color: "white",
+                              fontWeight: "bold",
                             }}
                           >
-                            Quarterly Revenue Loss (USD)
+                            {q}
                           </th>
-                        )}
-                        {showMonthlyRevenue && (
+                        ))}
+                      </tr>
+
+                      {/* Sub header row - LIGHT BLUE */}
+                      <tr
+                        style={{
+                          backgroundColor: "rgb(224, 242, 254)",
+                          textAlign: "center",
+                        }}
+                      >
+                        {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => [
                           <th
+                            key={`${q}-hc`}
                             style={{
-                              padding: 8,
-                              textAlign: "left",
-                              width: otherColumnWidth,
+                              ...wrapCell,
+                              color: "black",
+                              fontWeight: "bold",
                             }}
                           >
-                            Monthly Revenue (USD)
-                          </th>
-                        )}
+                            HC
+                          </th>,
+                          <th
+                            key={`${q}-rev`}
+                            style={{
+                              ...wrapCell,
+                              color: "black",
+                              fontWeight: "bold",
+                            }}
+                          >
+                            Revenue
+                          </th>,
+                        ])}
                       </tr>
                     </thead>
 
                     <tbody>
-                      {["Q1", "Q2", "Q3", "Q4"].map((quarter) => {
-                        const uniqueOwners = [
-                          ...new Set(tableFilteredData.map((row) => row.Owner)),
-                        ];
-
-                        const ownerRows = uniqueOwners.map((owner) => {
-                          const ownerQuarterData = tableFilteredData.filter(
-                            (row) => {
+                      {[...new Set(tableFilteredData.map((r) => r.Owner))].map(
+                        (owner, idx) => {
+                          const getQuarterValues = (quarter) => {
+                            const rows = tableFilteredData.filter((row) => {
                               if (row.Owner !== owner) return false;
-                              const monthVal = row[monthKey];
-                              if (!monthVal) return false;
-                              const month =
-                                new Date(`1-${monthVal}`).getMonth() + 1;
-                              const rowQuarter =
-                                month >= 1 && month <= 3
+                              const m = row[monthKey];
+                              if (!m) return false;
+
+                              const month = new Date(`1-${m}`).getMonth() + 1;
+
+                              const q =
+                                month <= 3
                                   ? "Q1"
-                                  : month >= 4 && month <= 6
+                                  : month <= 6
                                     ? "Q2"
-                                    : month >= 7 && month <= 9
+                                    : month <= 9
                                       ? "Q3"
                                       : "Q4";
-                              return rowQuarter === quarter;
-                            },
-                          );
 
-                          const totalHC = ownerQuarterData.reduce(
-                            (sum, row) => sum + safeNumber(row[hcBillableKey]),
-                            0,
-                          );
+                              return q === quarter;
+                            });
 
-                          const totalQuarterlyLoss = ownerQuarterData
-                            .reduce(
-                              (sum, row) =>
-                                sum + safeNumber(row[quarterlyLossKey]),
-                              0,
-                            )
-                            .toFixed(2);
-
-                          const totalMonthlyRevenue = ownerQuarterData
-                            .reduce(
-                              (sum, row) =>
-                                sum + safeNumber(row[monthlyRevenueKey]),
-                              0,
-                            )
-                            .toFixed(2);
-
-                          return {
-                            owner,
-                            hc: totalHC || 0,
-                            quarterlyLoss: totalQuarterlyLoss || "0.00",
-                            monthlyRevenue: totalMonthlyRevenue || "0.00",
+                            return {
+                              hc: rows.reduce(
+                                (s, r) => s + safeNumber(r[hcBillableKey]),
+                                0,
+                              ),
+                              revenue: rows
+                                .reduce(
+                                  (s, r) =>
+                                    s + safeNumber(r[monthlyRevenueKey]),
+                                  0,
+                                )
+                                .toFixed(2),
+                            };
                           };
-                        });
 
-                        const quarterTotalHC = ownerRows.reduce(
-                          (sum, row) => sum + row.hc,
-                          0,
-                        );
-                        const quarterTotalLoss = ownerRows
-                          .reduce(
-                            (sum, row) => sum + parseFloat(row.quarterlyLoss),
-                            0,
-                          )
-                          .toFixed(2);
-                        const quarterTotalMonthlyRevenue = ownerRows
-                          .reduce(
-                            (sum, row) => sum + parseFloat(row.monthlyRevenue),
-                            0,
-                          )
-                          .toFixed(2);
-
-                        return (
-                          <React.Fragment key={quarter}>
-                            {/* Quarter subtotal row */}
+                          return (
                             <tr
+                              key={owner}
                               style={{
-                                backgroundColor: "#e0f2fe",
-                                fontWeight: "bold",
-                                textAlign: "left",
+                                backgroundColor:
+                                  idx % 2 === 0 ? "#fff" : "#f9fafb",
                               }}
                             >
-                              <td
-                                style={{
-                                  padding: 8,
-                                  width: `${fixedFirstColumnWidth}%`,
-                                }}
-                              >
-                                {quarter}
-                              </td>
-                              <td
-                                style={{ padding: 8, width: otherColumnWidth }}
-                              >
-                                --
-                              </td>
-                              <td
-                                style={{ padding: 8, width: otherColumnWidth }}
-                              >
-                                {quarterTotalHC}
-                              </td>
-                              {showQuarterlyLoss && (
-                                <td
-                                  style={{
-                                    padding: 8,
-                                    width: otherColumnWidth,
-                                  }}
-                                >
-                                  {quarterTotalLoss}
-                                </td>
-                              )}
-                              {showMonthlyRevenue && (
-                                <td
-                                  style={{
-                                    padding: 8,
-                                    width: otherColumnWidth,
-                                  }}
-                                >
-                                  {quarterTotalMonthlyRevenue}
-                                </td>
-                              )}
+                              <td style={{ ...wrapCell }}>{owner}</td>
+
+                              {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => {
+                                const v = getQuarterValues(q);
+                                return [
+                                  <td
+                                    key={`${owner}-${q}-hc`}
+                                    style={{ ...wrapCell, textAlign: "center" }}
+                                  >
+                                    {v.hc}
+                                  </td>,
+                                  <td
+                                    key={`${owner}-${q}-rev`}
+                                    style={{ ...wrapCell, textAlign: "center" }}
+                                  >
+                                    {v.revenue}
+                                  </td>,
+                                ];
+                              })}
                             </tr>
-
-                            {/* Owner rows */}
-                            {ownerRows.map((row, idx) => (
-                              <tr
-                                key={`${quarter}-owner-${idx}`}
-                                style={{
-                                  backgroundColor:
-                                    idx % 2 === 0 ? "#ffffff" : "#f9fafb",
-                                  textAlign: "left",
-                                }}
-                              >
-                                <td
-                                  style={{
-                                    padding: 8,
-                                    width: `${fixedFirstColumnWidth}%`,
-                                  }}
-                                ></td>
-                                <td
-                                  style={{
-                                    padding: 8,
-                                    width: otherColumnWidth,
-                                  }}
-                                >
-                                  {row.owner}
-                                </td>
-                                <td
-                                  style={{
-                                    padding: 8,
-                                    width: otherColumnWidth,
-                                  }}
-                                >
-                                  {row.hc}
-                                </td>
-                                {showQuarterlyLoss && (
-                                  <td
-                                    style={{
-                                      padding: 8,
-                                      width: otherColumnWidth,
-                                    }}
-                                  >
-                                    {row.quarterlyLoss}
-                                  </td>
-                                )}
-                                {showMonthlyRevenue && (
-                                  <td
-                                    style={{
-                                      padding: 8,
-                                      width: otherColumnWidth,
-                                    }}
-                                  >
-                                    {row.monthlyRevenue}
-                                  </td>
-                                )}
-                              </tr>
-                            ))}
-                          </React.Fragment>
-                        );
-                      })}
-
-                      {/* Grand total row */}
-                      <tr
-                        style={{
-                          backgroundColor: "#1e3a8a",
-                          color: "white",
-                          fontWeight: "bold",
-                          textAlign: "left",
-                        }}
-                      >
-                        <td
-                          style={{
-                            padding: 8,
-                            width: `${fixedFirstColumnWidth}%`,
-                          }}
-                        >
-                          Grand Total
-                        </td>
-                        <td style={{ padding: 8, width: otherColumnWidth }}>
-                          --
-                        </td>
-                        <td style={{ padding: 8, width: otherColumnWidth }}>
-                          {tableFilteredData.reduce(
-                            (sum, row) => sum + safeNumber(row[hcBillableKey]),
-                            0,
-                          )}
-                        </td>
-                        {showQuarterlyLoss && (
-                          <td style={{ padding: 8, width: otherColumnWidth }}>
-                            {tableFilteredData
-                              .reduce(
-                                (sum, row) =>
-                                  sum + safeNumber(row[quarterlyLossKey]),
-                                0,
-                              )
-                              .toFixed(2)}
-                          </td>
-                        )}
-                        {showMonthlyRevenue && (
-                          <td style={{ padding: 8, width: otherColumnWidth }}>
-                            {tableFilteredData
-                              .reduce(
-                                (sum, row) =>
-                                  sum + safeNumber(row[monthlyRevenueKey]),
-                                0,
-                              )
-                              .toFixed(2)}
-                          </td>
-                        )}
-                      </tr>
+                          );
+                        },
+                      )}
                     </tbody>
                   </table>
                 </div>
