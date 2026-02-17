@@ -18,6 +18,7 @@ import {
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Doughnut, Bar, Line } from "react-chartjs-2";
 import Sidebar from "../organisms/sidebar/sidebar";
+import PptxGenJS from "pptxgenjs";
 import "../../css/dashboard.css";
 
 ChartJS.register(
@@ -121,24 +122,71 @@ const Dashboard = ({ user, onLogout }) => {
   }, []);
 
   // ================= DOWNLOAD SECTION =================
+  // const handleDownloadFullSection = async (type) => {
+  //   if (!chartSectionRef.current) return;
+
+  //   const canvas = await html2canvas(chartSectionRef.current, {
+  //     scale: 2,
+  //     backgroundColor: "#fff",
+  //     useCORS: true,
+  //   });
+
+  //   const link = document.createElement("a");
+  //   link.download = `dashboard.${type}`;
+  //   link.href =
+  //     type === "png"
+  //       ? canvas.toDataURL("image/png")
+  //       : canvas.toDataURL("image/jpeg", 1.0);
+  //   link.click();
+  // };
+  const chartRefs = useRef([]);
+  chartRefs.current = [];
   const handleDownloadFullSection = async (type) => {
-    if (!chartSectionRef.current) return;
+    if (type !== "ppt") return;
 
-    const canvas = await html2canvas(chartSectionRef.current, {
-      scale: 2,
-      backgroundColor: "#fff",
-      useCORS: true,
-    });
+    const pptx = new PptxGenJS();
+    pptx.layout = "LAYOUT_WIDE";
 
-    const link = document.createElement("a");
-    link.download = `dashboard.${type}`;
-    link.href =
-      type === "png"
-        ? canvas.toDataURL("image/png")
-        : canvas.toDataURL("image/jpeg", 1.0);
-    link.click();
+    const charts = document.querySelectorAll(".ppt-export");
+
+    if (!charts.length) {
+      alert("No charts found");
+      return;
+    }
+
+    for (let i = 0; i < charts.length; i++) {
+      const el = charts[i];
+
+      // ensure chart visible before capture
+      el.scrollIntoView({ block: "center" });
+
+      // wait for render stabilization
+      await new Promise((r) => setTimeout(r, 600));
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: document.body.scrollWidth,
+        windowHeight: document.body.scrollHeight,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const slide = pptx.addSlide();
+
+      slide.addImage({
+        data: imgData,
+        x: 0.5,
+        y: 0.5,
+        w: 9,
+        h: 5,
+      });
+    }
+
+    pptx.writeFile("Dashboard.pptx");
   };
-
   // ================= OWNER FILTER =================
   const ownerList = useMemo(() => {
     if (!jsonData.length) return [];
@@ -373,7 +421,6 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   // ----------------- Dynamic Trend Setup -----------------
-  // Update onTrendClick to receive trend type
 
   const dynamicTrends = useMemo(() => {
     return filesList.map((file, idx) => ({
@@ -532,85 +579,6 @@ const Dashboard = ({ user, onLogout }) => {
       });
   }, [dynamicTrends, selectedTrendCsv]);
 
-  // useEffect(() => {
-  //   if (!selectedTrendCsv) return;
-
-  //   setLoading(true);
-  //   setShowLoader(true);
-  //   const startTime = Date.now();
-
-  //   const csvBasePath = "/api/sharepoint"; // matches public/api/sharepoint
-  //   const urlMap = {
-  //     "Oppurtunity_Tracker/FY25/Month/Jan/Application Data_Opportunity Tracker.csv":
-  //       "Application_Data_Opportunity_Tracker.csv",
-  //     "Oppurtunity_Tracker/FY25/Month/Jan/Ramp_Down_Tracker.csv":
-  //       "Ramp_Down_Tracker.csv",
-  //   };
-  //   const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
-
-  //   const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}?v=${Date.now()}`;
-  //   console.log("Fetching CSV:", csvUrl);
-
-  //   fetch(csvUrl)
-  //     .then((res) => {
-  //       if (!res.ok)
-  //         throw new Error(
-  //           `Failed to fetch CSV: ${res.status} ${res.statusText}`,
-  //         );
-  //       return res.text();
-  //     })
-  //     .then((csvText) => {
-  //       if (!csvText || csvText.trim() === "") {
-  //         setJsonData([]);
-  //         setHeaders([]);
-  //         setLoading(false);
-  //         setShowLoader(false);
-  //         return;
-  //       }
-
-  //       Papa.parse(csvText, {
-  //         header: true,
-  //         skipEmptyLines: true,
-  //         dynamicTyping: true,
-  //         complete: (results) => {
-  //           const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-  //             (h) => h && h.trim() !== "",
-  //           );
-  //           const cleanedData = results.data.map((row) => {
-  //             const newRow = {};
-  //             cleanHeaders.forEach((h) => (newRow[h] = row[h]));
-  //             return newRow;
-  //           });
-  //           setJsonData(cleanedData);
-  //           setHeaders(cleanHeaders);
-
-  //           const elapsed = Date.now() - startTime;
-  //           setTimeout(
-  //             () => {
-  //               setLoading(false);
-  //               setShowLoader(false);
-  //             },
-  //             Math.max(0, 1000 - elapsed),
-  //           );
-  //         },
-  //         error: (err) => {
-  //           console.error("Papa parse error:", err);
-  //           setJsonData([]);
-  //           setHeaders([]);
-  //           setLoading(false);
-  //           setShowLoader(false);
-  //         },
-  //       });
-  //     })
-  //     .catch((err) => {
-  //       console.error("CSV load error:", err, "URL:", csvUrl);
-  //       setJsonData([]);
-  //       setHeaders([]);
-  //       setLoading(false);
-  //       setShowLoader(false);
-  //     });
-  // }, [selectedTrendCsv]);
-
   const formatUSD = (val) => {
     if (val >= 1e6) return `$${(val / 1e6).toFixed(1)} M`;
     if (val >= 1e3) return `$${(val / 1e3).toFixed(1)} K`;
@@ -629,28 +597,6 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   // ================== TABLE ==================
-  // const renderTable = () => (
-  //   <div className="table-container">
-  //     <table>
-  //       <thead>
-  //         <tr>
-  //           {headers.map((h, i) => (
-  //             <th key={i}>{h}</th>
-  //           ))}
-  //         </tr>
-  //       </thead>
-  //       <tbody>
-  //         {filteredData.slice(0, 20).map((row, i) => (
-  //           <tr key={i}>
-  //             {headers.map((h, j) => (
-  //               <td key={j}>{row[h]}</td>
-  //             ))}
-  //           </tr>
-  //         ))}
-  //       </tbody>
-  //     </table>
-  //   </div>
-  // );
 
   const renderTable = () => (
     <div className="table-container">
@@ -845,7 +791,7 @@ const Dashboard = ({ user, onLogout }) => {
                   ].sort((a, b) => a - b);
 
                   return (
-                    <div className="chart-card large-chart">
+                    <div className="chart-card large-chart ppt-export">
                       <h3>Actual Head Count by Start Month</h3>
 
                       {/* Financial Year Dropdown */}
@@ -947,7 +893,7 @@ const Dashboard = ({ user, onLogout }) => {
 
               {/* ===================== 2️⃣ HC vs Contract Line Chart ===================== */}
               {areaChartData && (
-                <div className="chart-card large-chart">
+                <div className="chart-card large-chart ppt-export">
                   <h3>Head Count vs Contract Value</h3>
 
                   {/* Year Dropdown */}
@@ -1147,7 +1093,7 @@ const Dashboard = ({ user, onLogout }) => {
 
               {/* ===================== 3️⃣ HC by Business Group ===================== */}
               {Object.keys(hcByBG).length > 0 && (
-                <div className="chart-card large-chart">
+                <div className="chart-card large-chart ppt-export">
                   <h3>Head Count by Business Group</h3>
 
                   <div
@@ -1220,7 +1166,7 @@ const Dashboard = ({ user, onLogout }) => {
 
               {/* ===================== 4️⃣ HC by Stakeholder (Doughnut) ===================== */}
               {Object.keys(hcByStakeholder).length > 0 && (
-                <div className="chart-card large-chart">
+                <div className="chart-card large-chart ppt-export">
                   <h3>Head Count by Stakeholder</h3>
 
                   <div
@@ -1376,7 +1322,7 @@ const Dashboard = ({ user, onLogout }) => {
 
               // 5️⃣ Render table card
               const combinedTableCard = (
-                <div className="chart-card" style={{ padding: 20 }}>
+                <div className="chart-card ppt-export" style={{ padding: 20 }}>
                   <h3 style={{ marginBottom: 12, color: "#333" }}>
                     Total RampDown
                   </h3>
@@ -1849,7 +1795,7 @@ const Dashboard = ({ user, onLogout }) => {
                   ) {
                     return (
                       <div
-                        className="chart-card large-chart"
+                        className="chart-card large-chart ppt-export"
                         key={title}
                         style={{ padding: 20 }}
                       >
@@ -1985,7 +1931,10 @@ const Dashboard = ({ user, onLogout }) => {
 
                   // ---------- Render Chart ----------
                   return (
-                    <div className="chart-card large-chart" key={title}>
+                    <div
+                      className="chart-card large-chart ppt-export"
+                      key={title}
+                    >
                       <h3>{title}</h3>
 
                       <div
@@ -2237,37 +2186,6 @@ const Dashboard = ({ user, onLogout }) => {
               : pageTitles[activePage]}
           </h2>
           {activePage === "trends" && (
-            // <div
-            //   style={{
-            //     marginBottom: 20,
-            //     display: "flex",
-            //     alignItems: "center",
-            //   }}
-            // >
-            //   <label htmlFor="ownerFilter">Filter by Owner: </label>
-            //   <select
-            //     id="ownerFilter"
-            //     value={selectedOwner}
-            //     onChange={(e) => setSelectedOwner(e.target.value)}
-            //     style={{ padding: "5px 10px", marginLeft: 10 }}
-            //   >
-            //     {ownerList.map((owner) => (
-            //       <option key={owner} value={owner}>
-            //         {owner}
-            //       </option>
-            //     ))}
-            //   </select>
-
-            //   <select
-            //     style={{ marginLeft: 20, padding: "5px 10px" }}
-            //     onChange={(e) => handleDownloadFullSection(e.target.value)}
-            //   >
-            //     <option value="">Download As</option>
-            //     <option value="png">PNG</option>
-            //     <option value="jpg">JPG</option>
-            //   </select>
-            // </div>
-
             <div className="owner-filter-bar">
               <label htmlFor="ownerFilter" className="owner-label">
                 Filter by Owner:
@@ -2286,6 +2204,15 @@ const Dashboard = ({ user, onLogout }) => {
                 ))}
               </select>
 
+              {/* <select
+                className="download-select"
+                onChange={(e) => handleDownloadFullSection(e.target.value)}
+              >
+                <option value="">Download As</option>
+                <option value="png">PNG</option>
+                <option value="jpg">JPG</option>
+              </select> */}
+
               <select
                 className="download-select"
                 onChange={(e) => handleDownloadFullSection(e.target.value)}
@@ -2293,6 +2220,7 @@ const Dashboard = ({ user, onLogout }) => {
                 <option value="">Download As</option>
                 <option value="png">PNG</option>
                 <option value="jpg">JPG</option>
+                <option value="ppt">PPT</option> {/* ✅ ADD */}
               </select>
             </div>
           )}
