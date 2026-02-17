@@ -1365,7 +1365,6 @@ const Dashboard = ({ user, onLogout }) => {
                     }}
                   >
                     <thead>
-                      {/* Top header row - DARK BLUE */}
                       <tr
                         style={{
                           backgroundColor: "rgb(30, 58, 138)",
@@ -1398,7 +1397,6 @@ const Dashboard = ({ user, onLogout }) => {
                         ))}
                       </tr>
 
-                      {/* Sub header row - LIGHT BLUE */}
                       <tr
                         style={{
                           backgroundColor: "rgb(224, 242, 254)",
@@ -1431,74 +1429,78 @@ const Dashboard = ({ user, onLogout }) => {
                     </thead>
 
                     <tbody>
-                      {[...new Set(tableFilteredData.map((r) => r.Owner))].map(
-                        (owner, idx) => {
-                          const getQuarterValues = (quarter) => {
-                            const rows = tableFilteredData.filter((row) => {
-                              if (row.Owner !== owner) return false;
-                              const m = row[monthKey];
-                              if (!m) return false;
+                      {[
+                        ...new Set(
+                          tableFilteredData
+                            .map((r) => (r?.Owner || "").trim()) // convert null/undefined to "" and trim
+                            .filter((owner) => owner !== ""), // remove any empty strings
+                        ),
+                      ].map((owner, idx) => {
+                        const getQuarterValues = (quarter) => {
+                          const rows = tableFilteredData.filter((row) => {
+                            if (!row?.Owner) return false;
+                            if (row.Owner.trim() !== owner) return false;
 
-                              const month = new Date(`1-${m}`).getMonth() + 1;
+                            const m = row[monthKey];
+                            if (!m) return false;
 
-                              const q =
-                                month <= 3
-                                  ? "Q1"
-                                  : month <= 6
-                                    ? "Q2"
-                                    : month <= 9
-                                      ? "Q3"
-                                      : "Q4";
+                            const month = new Date(`1-${m}`).getMonth() + 1;
+                            const q =
+                              month <= 3
+                                ? "Q1"
+                                : month <= 6
+                                  ? "Q2"
+                                  : month <= 9
+                                    ? "Q3"
+                                    : "Q4";
 
-                              return q === quarter;
-                            });
+                            return q === quarter;
+                          });
 
-                            return {
-                              hc: rows.reduce(
-                                (s, r) => s + safeNumber(r[hcBillableKey]),
+                          return {
+                            hc: rows.reduce(
+                              (s, r) => s + safeNumber(r[hcBillableKey]),
+                              0,
+                            ),
+                            revenue: rows
+                              .reduce(
+                                (s, r) => s + safeNumber(r[monthlyRevenueKey]),
                                 0,
-                              ),
-                              revenue: rows
-                                .reduce(
-                                  (s, r) =>
-                                    s + safeNumber(r[monthlyRevenueKey]),
-                                  0,
-                                )
-                                .toFixed(2),
-                            };
+                              )
+                              .toFixed(2),
                           };
+                        };
 
-                          return (
-                            <tr
-                              key={owner}
-                              style={{
-                                backgroundColor:
-                                  idx % 2 === 0 ? "#fff" : "#f9fafb",
-                              }}
-                            >
-                              <td style={{ ...wrapCell }}>{owner}</td>
+                        return (
+                          <tr
+                            key={owner}
+                            style={{
+                              backgroundColor:
+                                idx % 2 === 0 ? "#fff" : "#f9fafb",
+                            }}
+                          >
+                            <td style={{ ...wrapCell }}>{owner}</td>
 
-                              {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => {
-                                const v = getQuarterValues(q);
-                                return [
-                                  <td
-                                    key={`${owner}-${q}-hc`}
-                                    style={{ ...wrapCell, textAlign: "center" }}
-                                  >
-                                    {v.hc}
-                                  </td>,
-                                  <td
-                                    key={`${owner}-${q}-rev`}
-                                    style={{ ...wrapCell, textAlign: "center" }}
-                                  >
-                                    {v.revenue}
-                                  </td>,
-                                ];
-                              })}
-                            </tr>
-                          );
-                        },
-                      )}
+                            {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => {
+                              const v = getQuarterValues(q);
+                              return [
+                                <td
+                                  key={`${owner}-${q}-hc`}
+                                  style={{ ...wrapCell, textAlign: "center" }}
+                                >
+                                  {v.hc}
+                                </td>,
+                                <td
+                                  key={`${owner}-${q}-rev`}
+                                  style={{ ...wrapCell, textAlign: "center" }}
+                                >
+                                  {v.revenue}
+                                </td>,
+                              ];
+                            })}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
