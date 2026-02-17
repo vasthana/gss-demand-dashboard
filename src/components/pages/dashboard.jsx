@@ -1355,7 +1355,7 @@ const Dashboard = ({ user, onLogout }) => {
                     </div>
                   </div>
 
-                  {/* Table */}
+                  {/* Table Layout*/}
                   <table
                     style={{
                       width: "100%",
