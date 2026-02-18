@@ -186,14 +186,111 @@
 #           github_token: ${{ secrets.GITHUB_TOKEN }}
 #           publish_dir: ./build
 
+# name: Deploy React App to GitHub Pages
+
+# on:
+#   workflow_dispatch:  # manual trigger if needed
+#   push:
+#     branches:
+#       - main  # triggers on JSX/code changes
+
+# permissions:
+#   contents: write
+
+# jobs:
+#   # ----------------------------------------
+#   # CSV Build & Deploy (OneDrive changes)
+#   # ----------------------------------------
+#   csv-deploy:
+#     runs-on: self-hosted
+#     if: github.event_name == 'workflow_dispatch'  # triggered manually or via watcher script
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Check OneDrive CSV changes & build
+#         id: csv_build
+#         shell: powershell
+#         run: |
+#           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
+#           $DEST_PATH="build/api/sharepoint"
+#           New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
+
+#           $csvChanged = $false
+
+#           foreach ($folder in @("Demand Tracker_New Transitions","Ramp Down Tracker")) {
+#             $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\$folder\*.csv" -ErrorAction SilentlyContinue
+#             foreach ($file in $csvFiles) {
+#               $destFile = Join-Path $DEST_PATH $file.Name
+#               if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
+#                 Copy-Item $file.FullName $destFile -Force
+#                 $csvChanged = $true
+#               }
+#             }
+#           }
+
+#           # Generate files.json
+#           $files = Get-ChildItem $DEST_PATH -Filter *.csv -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+#           $json = @{ files = $files } | ConvertTo-Json -Depth 2
+#           $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
+
+#           if ($csvChanged) {
+#             Write-Host "CSV changes detected, starting build..."
+#           } else {
+#             Write-Host "No CSV changes detected, still building to deploy."
+#           }
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Build project (React + CSV)
+#         run: npm run build
+
+#       - name: Deploy to GH Pages
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
+
+#   # ----------------------------------------
+#   # JSX/Code Push Deploy
+#   # ----------------------------------------
+#   code-deploy:
+#     runs-on: self-hosted
+#     if: github.event_name == 'push'
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Build project (React JSX)
+#         run: npm run build
+
+#       - name: Deploy to GH Pages
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
 
 name: Deploy React App to GitHub Pages
 
 on:
-  workflow_dispatch:  # manual trigger if needed
+  workflow_dispatch: # manual trigger if needed
   push:
     branches:
-      - main  # triggers on JSX/code changes
+      - main # triggers on JSX/code changes
 
 permissions:
   contents: write
@@ -204,10 +301,14 @@ jobs:
   # ----------------------------------------
   csv-deploy:
     runs-on: self-hosted
-    if: github.event_name == 'workflow_dispatch'  # triggered manually or via watcher script
+    if: github.event_name == 'workflow_dispatch' # triggered manually or via watcher script
     steps:
-      - name: Checkout repository
+      - name: Checkout repository using local Git
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # ensures full history
+          persist-credentials: false
+          lfs: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -265,8 +366,12 @@ jobs:
     runs-on: self-hosted
     if: github.event_name == 'push'
     steps:
-      - name: Checkout repository
+      - name: Checkout repository using local Git
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          lfs: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
