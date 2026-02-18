@@ -284,6 +284,115 @@
 #           github_token: ${{ secrets.GITHUB_TOKEN }}
 #           publish_dir: ./build
 
+# name: Deploy React App to GitHub Pages
+
+# on:
+#   workflow_dispatch:
+#   push:
+#     branches:
+#       - main
+
+# permissions:
+#   contents: write
+
+# jobs:
+#   # ----------------------------------------
+#   # CSV Build & Deploy (OneDrive changes)
+#   # ----------------------------------------
+#   csv-deploy:
+#     runs-on: self-hosted
+#     if: github.event_name == 'workflow_dispatch'
+
+#     # ✅ ADD THIS BLOCK (instant SSL workaround)
+#     env:
+#       NODE_TLS_REJECT_UNAUTHORIZED: "0"
+#       GIT_SSL_NO_VERIFY: "true"
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Check OneDrive CSV changes & build
+#         id: csv_build
+#         shell: powershell
+#         run: |
+#           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
+#           $DEST_PATH="build/api/sharepoint"
+#           New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
+
+#           $csvChanged = $false
+
+#           foreach ($folder in @("Demand Tracker_New Transitions","Ramp Down Tracker")) {
+#             $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\$folder\*.csv" -ErrorAction SilentlyContinue
+#             foreach ($file in $csvFiles) {
+#               $destFile = Join-Path $DEST_PATH $file.Name
+#               if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
+#                 Copy-Item $file.FullName $destFile -Force
+#                 $csvChanged = $true
+#               }
+#             }
+#           }
+
+#           $files = Get-ChildItem $DEST_PATH -Filter *.csv -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+#           $json = @{ files = $files } | ConvertTo-Json -Depth 2
+#           $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
+
+#           if ($csvChanged) {
+#             Write-Host "CSV changes detected, starting build..."
+#           } else {
+#             Write-Host "No CSV changes detected, still building to deploy."
+#           }
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Build project
+#         run: npm run build
+
+#       - name: Deploy to GH Pages
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
+
+#   # ----------------------------------------
+#   # JSX/Code Push Deploy
+#   # ----------------------------------------
+#   code-deploy:
+#     runs-on: self-hosted
+#     if: github.event_name == 'push'
+
+#     # ✅ ADD THIS BLOCK HERE TOO
+#     env:
+#       NODE_TLS_REJECT_UNAUTHORIZED: "0"
+#       GIT_SSL_NO_VERIFY: "true"
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: 18
+
+#       - name: Install dependencies
+#         run: npm install
+
+#       - name: Build project
+#         run: npm run build
+
+#       - name: Deploy to GH Pages
+#         uses: peaceiris/actions-gh-pages@v4
+#         with:
+#           github_token: ${{ secrets.GITHUB_TOKEN }}
+#           publish_dir: ./build
+
 name: Deploy React App to GitHub Pages
 
 on:
@@ -303,7 +412,6 @@ jobs:
     runs-on: self-hosted
     if: github.event_name == 'workflow_dispatch'
 
-    # ✅ ADD THIS BLOCK (instant SSL workaround)
     env:
       NODE_TLS_REJECT_UNAUTHORIZED: "0"
       GIT_SSL_NO_VERIFY: "true"
@@ -317,42 +425,36 @@ jobs:
         with:
           node-version: 18
 
-      - name: Check OneDrive CSV changes & build
-        id: csv_build
+      - name: Copy OneDrive CSV files
         shell: powershell
         run: |
           $ONEDRIVE_PATH="D:\One drive\OneDrive - FUJITSU\IN - OneAsia1 BPS PM - FY 25-26"
           $DEST_PATH="build/api/sharepoint"
           New-Item -ItemType Directory -Force -Path $DEST_PATH | Out-Null
 
-          $csvChanged = $false
-
           foreach ($folder in @("Demand Tracker_New Transitions","Ramp Down Tracker")) {
             $csvFiles = Get-ChildItem "$ONEDRIVE_PATH\$folder\*.csv" -ErrorAction SilentlyContinue
             foreach ($file in $csvFiles) {
-              $destFile = Join-Path $DEST_PATH $file.Name
-              if (!(Test-Path $destFile) -or ((Get-FileHash $file.FullName).Hash -ne (Get-FileHash $destFile).Hash)) {
-                Copy-Item $file.FullName $destFile -Force
-                $csvChanged = $true
-              }
+              Copy-Item $file.FullName (Join-Path $DEST_PATH $file.Name) -Force
             }
           }
 
+          # Generate files.json
           $files = Get-ChildItem $DEST_PATH -Filter *.csv -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
           $json = @{ files = $files } | ConvertTo-Json -Depth 2
-          $json | Out-File "$DEST_PATH/../files.json" -Encoding utf8
-
-          if ($csvChanged) {
-            Write-Host "CSV changes detected, starting build..."
-          } else {
-            Write-Host "No CSV changes detected, still building to deploy."
-          }
+          $json | Out-File "build/api/files.json" -Encoding utf8
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build project
+      - name: Build React app
         run: npm run build
+
+      # 🔥 ensures Pages timestamp always updates
+      - name: Force deploy timestamp update
+        shell: powershell
+        run: |
+          "Deploy time: $(Get-Date)" | Out-File build/deploy-time.txt -Append
 
       - name: Deploy to GH Pages
         uses: peaceiris/actions-gh-pages@v4
@@ -367,7 +469,6 @@ jobs:
     runs-on: self-hosted
     if: github.event_name == 'push'
 
-    # ✅ ADD THIS BLOCK HERE TOO
     env:
       NODE_TLS_REJECT_UNAUTHORIZED: "0"
       GIT_SSL_NO_VERIFY: "true"
@@ -384,8 +485,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build project
+      - name: Build React app
         run: npm run build
+
+      # 🔥 ensures Pages timestamp always updates
+      - name: Force deploy timestamp update
+        shell: powershell
+        run: |
+          "Deploy time: $(Get-Date)" | Out-File build/deploy-time.txt -Append
 
       - name: Deploy to GH Pages
         uses: peaceiris/actions-gh-pages@v4
