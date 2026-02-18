@@ -461,7 +461,8 @@ const Dashboard = ({ user, onLogout }) => {
   // }, []);
 
   useEffect(() => {
-    fetch(process.env.PUBLIC_URL + "/api/files.json")
+    // fetch(process.env.PUBLIC_URL + "/api/files.json")
+    fetch(`${process.env.PUBLIC_URL}/api/files.json?v=${Date.now()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.files?.length) {
