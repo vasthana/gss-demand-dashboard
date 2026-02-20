@@ -393,3 +393,152 @@
     padding: 10px 12px;
   }
 }
+
+/* ===========================
+   TABLE SCROLL CONTAINER
+   =========================== */
+.table-responsive {
+  width: 100%;
+  max-height: 70vh; /* adjust as needed */
+  overflow: auto;
+  position: relative;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
+
+  /* hide scrollbar */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+.table-responsive.dragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+.table-responsive.dragging * {
+  user-select: none;
+  pointer-events: none; /* prevent text selection inside table */
+}
+
+/* hide scrollbar Chrome / Safari / Edge */
+.table-responsive::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* ===========================
+   TABLE BASE
+   =========================== */
+.table-responsive table {
+  width: 200%; /* wide enough to allow horizontal scroll */
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: fixed;
+  background: white;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===========================
+   HEADER
+   =========================== */
+.table-responsive th {
+  padding: 8px;
+  text-align: center;
+  font-weight: bold;
+  white-space: nowrap;
+  position: relative;
+  z-index: 2;
+}
+
+.table-responsive thead tr:first-child th {
+  background-color: rgb(30, 58, 138);
+  color: white;
+}
+
+.table-responsive thead tr:nth-child(2) th {
+  background-color: rgb(224, 242, 254);
+  color: black;
+  z-index: 2;
+}
+
+/* ===========================
+   CELLS
+   =========================== */
+.table-responsive td {
+  padding: 8px;
+  text-align: center;
+  word-break: break-word;
+  background: white;
+  position: relative;
+  z-index: 1;
+}
+
+/* ===========================
+   ZEBRA ROWS
+   =========================== */
+.table-responsive tbody tr:nth-child(even) td {
+  background-color: #f9fafb;
+}
+
+.table-responsive tbody tr:nth-child(odd) td {
+  background-color: #ffffff;
+}
+
+/* ===========================
+   FROZEN FIRST COLUMN (DESKTOP)
+   =========================== */
+
+/* header */
+.table-responsive thead th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5; /* keep small to avoid blocking drag */
+  background: rgb(30, 58, 138);
+}
+
+/* body */
+.table-responsive tbody td:first-child {
+  position: sticky;
+  left: 0;
+  font-weight: 600;
+  background: white;
+  z-index: 5;
+}
+
+/* keep zebra colors on frozen column */
+.table-responsive tbody tr:nth-child(even) td:first-child {
+  background: #f9fafb;
+}
+
+.table-responsive tbody tr:nth-child(odd) td:first-child {
+  background: #ffffff;
+}
+
+/* divider shadow */
+.table-responsive th:first-child,
+.table-responsive td:first-child {
+  box-shadow: 3px 0 6px rgba(0, 0, 0, 0.12);
+}
+
+/* ===========================
+   MOBILE: REMOVE FREEZE
+   =========================== */
+@media (max-width: 768px) {
+  .table-responsive {
+    max-height: none;
+    cursor: auto;
+  }
+
+  .table-responsive table {
+    min-width: 700px;
+  }
+
+  .table-responsive thead th:first-child,
+  .table-responsive tbody td:first-child {
+    position: static;
+    z-index: auto;
+    box-shadow: none;
+  }
+}

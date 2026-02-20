@@ -39,13 +39,26 @@ const Dashboard = ({ user, onLogout }) => {
   const navigate = useNavigate();
   const [jsonData, setJsonData] = useState([]);
   const [headers, setHeaders] = useState([]);
+  const [selectedTableYear1, setSelectedTableYear1] = useState(null);
+  const monthlyContractValueKey = React.useMemo(() => {
+    if (!headers?.length) return "Monthly Contract Value";
+
+    return (
+      headers.find(
+        (h) =>
+          h.toLowerCase().includes("contract") &&
+          h.toLowerCase().includes("value"),
+      ) || "Monthly Contract Value"
+    );
+  }, [headers]);
+
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState("trends");
   const [selectedOwner, setSelectedOwner] = useState("All");
   const [showLoader, setShowLoader] = useState(true);
   const [filesList, setFilesList] = useState([]);
   const [selectedFY, setSelectedFY] = React.useState(null); // null means "All Years"
-  // At the top of your component
+  const fjChartRef = React.useRef(null);
   const rampChartRefs = useRef([]); // array of refs for Ramp Down charts
   const [rampActiveDatasets, setRampActiveDatasets] = useState(
     Array(4).fill([true, true, true]), // 4 charts, each with 3 datasets initially active
@@ -65,11 +78,133 @@ const Dashboard = ({ user, onLogout }) => {
   const [activeTrendView, setActiveTrendView] = useState("TrendView1");
   const [trendView1Layout, setTrendView1Layout] = useState("1x2"); // default for TrendView1
   const [trendView2Layout, setTrendView2Layout] = useState("1x2"); // default for TrendView2
+  const [trendView3Layout, setTrendView3Layout] = useState("1x2"); // default for TrendView3
+  // ----------------------------
+  // Safe parsing functions
+  // ----------------------------
+  const parseHC = (val) => {
+    if (!val) return 0;
+    return Number(val) || 0; // handles 1.5, 2, 0
+  };
+
+  const parseMoney = (val) => {
+    if (!val) return 0;
+    if (typeof val === "number") return val;
+    const cleaned = String(val).replace(/[$,]/g, ""); // remove $ and commas
+    return Number(cleaned) || 0;
+  };
+
+  // Touch Scroll table//
+  const tableRef1 = useRef(null);
+  const tableRef2 = useRef(null);
+  // const tableRef3 = useRef(null);
+  const setTableRef1 = (el) => {
+    if (el) {
+      tableRef1.current = el;
+      attachDrag(el, "Table1");
+    }
+  };
+
+  const setTableRef2 = (el) => {
+    if (el) {
+      tableRef2.current = el;
+      attachDrag(el, "Table2");
+    }
+  };
+
+  // const setTableRef3 = (el) => {
+  //   if (el) {
+  //     tableRef3.current = el;
+  //     attachDrag(el, "Table2");
+  //   }
+  // };
+
+  // attachDrag function same as before, defined outside
+  const attachDrag = (slider, tableName) => {
+    let isDown = false;
+    let startX = 0;
+    let startY = 0;
+    let scrollLeft = 0;
+    let scrollTop = 0;
+
+    const dragStart = (x, y) => {
+      isDown = true;
+      startX = x;
+      startY = y;
+      scrollLeft = slider.scrollLeft;
+      scrollTop = slider.scrollTop;
+      slider.classList.add("dragging");
+      // console.log(`[${tableName}] Drag started`);
+    };
+
+    const dragEnd = () => {
+      if (!isDown) return;
+      isDown = false;
+      slider.classList.remove("dragging");
+      // console.log(`[${tableName}] Drag stopped`);
+    };
+
+    const dragMove = (x, y) => {
+      if (!isDown) return;
+      const dx = x - startX;
+      const dy = y - startY;
+      slider.scrollLeft = scrollLeft - dx * 1.5;
+      slider.scrollTop = scrollTop - dy * 1.2;
+      // console.log(`[${tableName}] Dragging`, {
+      // scrollLeft: slider.scrollLeft,
+      // scrollTop: slider.scrollTop,
+      //});
+    };
+
+    slider.addEventListener("mousedown", (e) =>
+      dragStart(e.clientX, e.clientY),
+    );
+    slider.addEventListener("mousemove", (e) => {
+      e.preventDefault();
+      dragMove(e.clientX, e.clientY);
+    });
+    slider.addEventListener("mouseup", dragEnd);
+    slider.addEventListener("mouseleave", dragEnd);
+
+    slider.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches.length === 1) {
+          const touch = e.touches[0];
+          dragStart(touch.clientX, touch.clientY);
+        }
+      },
+      { passive: false },
+    );
+
+    slider.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!isDown || e.touches.length !== 1) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        dragMove(touch.clientX, touch.clientY);
+      },
+      { passive: false },
+    );
+
+    slider.addEventListener("touchend", dragEnd);
+
+    slider.addEventListener(
+      "wheel",
+      (e) => {
+        if (e.shiftKey || Math.abs(e.deltaX) > 0) {
+          slider.scrollLeft += e.deltaY;
+          e.preventDefault();
+          console.log(`[${tableName}] Wheel scroll`, slider.scrollLeft);
+        }
+      },
+      { passive: false },
+    );
+  };
 
   // ---------- Column keys ----------
-
   const [selectedTableYear, setSelectedTableYear] = useState(null);
-
   const monthKey = "Ramp down Month"; // Correct Month column
 
   // Detect if currently selected CSV is Ramp Down
@@ -78,6 +213,7 @@ const Dashboard = ({ user, onLogout }) => {
     () => ({
       "new-transitions": `Application_Data_Opportunity_Tracker.csv`,
       "ramp-down-project": `Application_Data_Ramp_Down.csv`,
+      "new-joiner-list": `Member_Detail.csv`,
     }),
     [],
   );
@@ -118,6 +254,7 @@ const Dashboard = ({ user, onLogout }) => {
       if (mobile) {
         setTrendView1Layout("3x1");
         setTrendView2Layout("3x1");
+        setTrendView3Layout("3x1");
       }
     };
 
@@ -126,49 +263,55 @@ const Dashboard = ({ user, onLogout }) => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ================= DOWNLOAD SECTION =================
-  // const handleDownloadFullSection = async (type) => {
-  //   if (!chartSectionRef.current) return;
-
-  //   const canvas = await html2canvas(chartSectionRef.current, {
-  //     scale: 2,
-  //     backgroundColor: "#fff",
-  //     useCORS: true,
-  //   });
-
-  //   const link = document.createElement("a");
-  //   link.download = `dashboard.${type}`;
-  //   link.href =
-  //     type === "png"
-  //       ? canvas.toDataURL("image/png")
-  //       : canvas.toDataURL("image/jpeg", 1.0);
-  //   link.click();
-  // };
-  const chartRefs = useRef([]);
-  chartRefs.current = [];
   const handleDownloadFullSection = async (type) => {
-    if (type !== "ppt") return;
+    if (!chartSectionRef.current) return;
 
-    const pptx = new PptxGenJS();
-    pptx.layout = "LAYOUT_WIDE";
+    if (type === "ppt") {
+      const pptx = new PptxGenJS();
+      pptx.layout = "LAYOUT_WIDE";
 
-    const charts = document.querySelectorAll(".ppt-export");
+      // Grab all charts with the .ppt-export class
+      const charts = document.querySelectorAll(".ppt-export");
+      if (!charts.length) {
+        alert("No charts found");
+        return;
+      }
 
-    if (!charts.length) {
-      alert("No charts found");
-      return;
-    }
+      for (let i = 0; i < charts.length; i++) {
+        const el = charts[i];
 
-    for (let i = 0; i < charts.length; i++) {
-      const el = charts[i];
+        // Ensure the chart is visible before capture
+        el.scrollIntoView({ block: "center" });
 
-      // ensure chart visible before capture
-      el.scrollIntoView({ block: "center" });
+        // Small delay to allow render stabilization
+        await new Promise((r) => setTimeout(r, 500));
 
-      // wait for render stabilization
-      await new Promise((r) => setTimeout(r, 600));
+        const canvas = await html2canvas(el, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+          windowWidth: document.body.scrollWidth,
+          windowHeight: document.body.scrollHeight,
+        });
 
-      const canvas = await html2canvas(el, {
+        const imgData = canvas.toDataURL("image/png");
+
+        const slide = pptx.addSlide();
+        slide.addImage({
+          data: imgData,
+          x: 0.5,
+          y: 0.5,
+          w: 9,
+          h: 5,
+        });
+      }
+
+      // Save PPTX after all charts are added
+      pptx.writeFile("Dashboard.pptx");
+    } else if (type === "png" || type === "jpg") {
+      // Capture entire chart section for PNG / JPG
+      const canvas = await html2canvas(chartSectionRef.current, {
         scale: 2,
         useCORS: true,
         logging: false,
@@ -177,37 +320,49 @@ const Dashboard = ({ user, onLogout }) => {
         windowHeight: document.body.scrollHeight,
       });
 
-      const imgData = canvas.toDataURL("image/png");
-
-      const slide = pptx.addSlide();
-
-      slide.addImage({
-        data: imgData,
-        x: 0.5,
-        y: 0.5,
-        w: 9,
-        h: 5,
-      });
+      const link = document.createElement("a");
+      link.download = `dashboard.${type}`;
+      link.href =
+        type === "png"
+          ? canvas.toDataURL("image/png")
+          : canvas.toDataURL("image/jpeg", 1.0);
+      link.click();
     }
-
-    pptx.writeFile("Dashboard.pptx");
   };
-  // ================= OWNER FILTER =================
-  const ownerList = useMemo(() => {
-    if (!jsonData.length) return [];
-    const ownerKey = headers.find((h) => h.toLowerCase().includes("owner"));
-    if (!ownerKey) return [];
-    const owners = Array.from(
-      new Set(jsonData.map((row) => row[ownerKey]).filter(Boolean)),
-    ).sort();
-    return ["All", ...owners];
-  }, [jsonData, headers]);
 
+  // ================= OWNER FILTER =================
   const filteredData = useMemo(() => {
     if (selectedOwner === "All") return jsonData;
-    const ownerKey = headers.find((h) => h.toLowerCase().includes("owner"));
-    return jsonData.filter((row) => row[ownerKey] === selectedOwner);
+
+    const ownerKey = headers
+      .find((h) => h.toLowerCase().includes("owner"))
+      ?.trim();
+    if (!ownerKey) return jsonData;
+
+    return jsonData.filter(
+      (row) => row[ownerKey]?.toString().trim() === selectedOwner,
+    );
   }, [jsonData, selectedOwner, headers]);
+
+  // 2️⃣ Owner list with trimmed, cleaned values
+  const ownerList = useMemo(() => {
+    if (!jsonData.length) return [];
+
+    const ownerKey = headers
+      .find((h) => h.toLowerCase().includes("owner"))
+      ?.trim();
+    if (!ownerKey) return [];
+
+    const owners = Array.from(
+      new Set(
+        jsonData
+          .map((row) => row[ownerKey]?.toString().trim())
+          .filter((v) => v && v !== "`"), // remove empty/backtick
+      ),
+    ).sort();
+
+    return ["All", ...owners];
+  }, [jsonData, headers]);
 
   const kpiValues = useMemo(() => {
     if (!filteredData || !filteredData.length) return [];
@@ -223,154 +378,86 @@ const Dashboard = ({ user, onLogout }) => {
     // =====================================================
     // 🔹 DYNAMIC TRENDS PAGE
     // =====================================================
-    // if (activePage === "trends") {
-    //   const totalOpportunity = filteredData.filter(
-    //     (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
-    //   ).length;
-
-    //   const hcKey = headers.find((h) => h.toLowerCase().includes("hc"));
-
-    //   const amountKey = headers.find(
-    //     (h) =>
-    //       h.toLowerCase().includes("amount") ||
-    //       h.toLowerCase().includes("revenue") ||
-    //       h.toLowerCase().includes("contract"),
-    //   );
-
-    //   const totalHC = hcKey
-    //     ? filteredData.reduce((sum, row) => sum + safeNumber(row[hcKey]), 0)
-    //     : 0;
-
-    //   const totalAmount = amountKey
-    //     ? filteredData.reduce((sum, row) => sum + safeNumber(row[amountKey]), 0)
-    //     : 0;
-
-    //   const totalMonthly = totalAmount / 3; // approximate
-    //   const totalYearly = totalAmount * 4;
-
-    //   return [
-    //     { title: "Total RampDown", value: totalOpportunity },
-    //     { title: "Total HC", value: totalHC },
-    //     { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
-    //     { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
-    //   ];
-    // }
-
     if (activePage === "trends") {
-      const totalOpportunity = filteredData.filter(
-        (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
-      ).length;
+      if (activeTrendView === "TrendView3") {
+        // ---------- TrendView3 KPIs ----------
+        const memberKey = headers.find((h) => h.trim() === "Member Name");
+        const fjLevelKey = headers.find((h) => h.trim() === "FJ level");
+        const jlptLevelKey = headers.find(
+          (h) => h.trim() === "JLPT Level/Major Skill",
+        );
 
-      const totalRampDown = filteredData.length; // or use your rampdown logic if different
+        const totalMember = memberKey
+          ? filteredData.filter(
+              (row) =>
+                row[memberKey] && row[memberKey].toString().trim() !== "",
+            ).length
+          : 0;
 
-      const hcKey = headers.find((h) => h.toLowerCase().includes("hc"));
+        const totalFJLevel = fjLevelKey
+          ? filteredData.filter(
+              (row) =>
+                row[fjLevelKey] && row[fjLevelKey].toString().trim() !== "",
+            ).length
+          : 0;
 
-      const amountKey = headers.find(
-        (h) =>
-          h.toLowerCase().includes("amount") ||
-          h.toLowerCase().includes("revenue") ||
-          h.toLowerCase().includes("contract"),
-      );
+        const totalJLPTLevel = jlptLevelKey
+          ? filteredData.filter(
+              (row) =>
+                row[jlptLevelKey] && row[jlptLevelKey].toString().trim() !== "",
+            ).length
+          : 0;
 
-      const totalHC = hcKey
-        ? filteredData.reduce((sum, row) => sum + safeNumber(row[hcKey]), 0)
-        : 0;
+        return [
+          { title: "Total Member", value: totalMember },
+          { title: "Total FJ Level", value: totalFJLevel },
+          { title: "Total JLPT Level", value: totalJLPTLevel },
+        ];
+      } else {
+        // ---------- TrendView1 & TrendView2 KPIs ----------
+        const totalOpportunity = filteredData.filter(
+          (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
+        ).length;
 
-      const totalAmount = amountKey
-        ? filteredData.reduce((sum, row) => sum + safeNumber(row[amountKey]), 0)
-        : 0;
+        const totalRampDown = filteredData.filter(
+          (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
+        ).length;
 
-      const totalMonthly = totalAmount / 3;
-      const totalYearly = totalAmount * 4;
+        const hcKey = headers.find((h) => h.toLowerCase().includes("hc"));
 
-      // 👇 dynamic KPI title + value
-      // const firstKpi =
-      //   activeTrendView === "activeTrendView1"
-      //     ? { title: "Total Opportunity", value: totalOpportunity }
-      //     : { title: "Total RampDown", value: totalRampDown };
-      const firstKpi =
-        activeTrendView === "TrendView1"
-          ? { title: "Total Opportunity", value: totalOpportunity }
-          : { title: "Total RampDown", value: totalRampDown };
+        const amountKey = headers.find(
+          (h) =>
+            h.toLowerCase().includes("amount") ||
+            h.toLowerCase().includes("revenue") ||
+            h.toLowerCase().includes("contract"),
+        );
 
-      return [
-        firstKpi,
-        { title: "Total HC", value: totalHC },
-        { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
-        { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
-      ];
-    }
+        const totalHC = hcKey
+          ? filteredData.reduce((sum, row) => sum + safeNumber(row[hcKey]), 0)
+          : 0;
 
-    // =====================================================
-    // 🟢 NEW TRANSITIONS (Opportunity Tracker)
-    // =====================================================
-    if (activePage === "new-transitions") {
-      const contractKey = headers.find(
-        (h) => h.trim().toLowerCase() === "quarterly contract value",
-      );
+        const totalAmount = amountKey
+          ? filteredData.reduce(
+              (sum, row) => sum + safeNumber(row[amountKey]),
+              0,
+            )
+          : 0;
 
-      const hcKey = headers.find(
-        (h) =>
-          h.toLowerCase().includes("actual") && h.toLowerCase().includes("hc"),
-      );
+        const totalMonthly = totalAmount / 3;
+        const totalYearly = totalAmount * 4;
 
-      const totalOpportunity = filteredData.filter(
-        (row) => row[firstCol] && String(row[firstCol]).trim() !== "",
-      ).length;
+        const firstKpi =
+          activeTrendView === "TrendView1"
+            ? { title: "Total Opportunity", value: totalOpportunity }
+            : { title: "Total RampDown", value: totalRampDown };
 
-      const totalHC = hcKey
-        ? filteredData.reduce((sum, row) => sum + safeNumber(row[hcKey]), 0)
-        : 0;
-
-      const totalQuarterly = contractKey
-        ? filteredData.reduce(
-            (sum, row) => sum + safeNumber(row[contractKey]),
-            0,
-          )
-        : 0;
-
-      const totalMonthly = totalQuarterly / 3;
-      const totalYearly = totalQuarterly * 4;
-
-      return [
-        { title: "Total Opportunity", value: totalOpportunity },
-        { title: "Total HC", value: totalHC },
-        { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
-        { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
-      ];
-    }
-
-    // =====================================================
-    // 🔵 RAMP DOWN PROJECT
-    // =====================================================
-    if (activePage === "ramp-down-project") {
-      const hcKey = headers.find(
-        (h) => h.trim().toLowerCase() === "hc( billable only)",
-      );
-
-      const monthlyRevenueKey = headers.find(
-        (h) => h.trim().toLowerCase() === "monthly revenue",
-      );
-
-      const totalHC = hcKey
-        ? filteredData.reduce((sum, row) => sum + safeNumber(row[hcKey]), 0)
-        : 0;
-
-      const totalMonthly = monthlyRevenueKey
-        ? filteredData.reduce(
-            (sum, row) => sum + safeNumber(row[monthlyRevenueKey]),
-            0,
-          )
-        : 0;
-
-      const totalYearly = totalMonthly * 12;
-
-      return [
-        { title: "Total Projects", value: filteredData.length },
-        { title: "Total HC", value: totalHC },
-        { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
-        { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
-      ];
+        return [
+          firstKpi,
+          { title: "Total HC", value: totalHC },
+          { title: "Total Amount (Monthly)", value: totalMonthly, isUSD: true },
+          { title: "Total Amount (Yearly)", value: totalYearly, isUSD: true },
+        ];
+      }
     }
 
     return [];
@@ -426,7 +513,6 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   // ----------------- Dynamic Trend Setup -----------------
-
   const dynamicTrends = useMemo(() => {
     return filesList.map((file, idx) => ({
       id: `trend${idx + 1}`,
@@ -448,142 +534,95 @@ const Dashboard = ({ user, onLogout }) => {
     }
   }, [activePage, trackingPageCsvMap, pageTitles]);
 
-  //Files.json//
-  // useEffect(() => {
-  //   fetch(process.env.PUBLIC_URL + "/api/files.json")
-  //     .then((res) => res.json())
-  //     .then((data) => {
-  //       if (data?.files?.length) {
-  //         setFilesList(data.files);
-  //       }
-  //     })
-  //     .catch((err) => console.error("Error loading files.json:", err));
-  // }, []);
-
   useEffect(() => {
-    // fetch(process.env.PUBLIC_URL + "/api/files.json")
-    fetch(`${process.env.PUBLIC_URL}/api/files.json?v=${Date.now()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.files?.length) {
-          setFilesList(data.files);
+    const fetchFiles = async () => {
+      try {
+        const res = await fetch(
+          `${process.env.PUBLIC_URL}/files.json?v=${Date.now()}`,
+        );
+        const data = await res.json();
+        // Pick the latest timestamp key
+        const latestKey = Object.keys(data).sort().pop();
+        if (latestKey && Array.isArray(data[latestKey])) {
+          setFilesList(data[latestKey]);
         }
-      })
-      .catch((err) => console.error("Error loading files.json:", err));
+      } catch (err) {
+        console.error("Error loading files.json:", err);
+      }
+    };
+
+    fetchFiles();
+    const interval = setInterval(fetchFiles, 5000); // poll every 5s
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
-    // 1️⃣ Initialize first Trend CSV automatically
-    if (!selectedTrendCsv && dynamicTrends.length > 0) {
-      console.log("Initializing first trend CSV:", dynamicTrends[0].file);
-      setSelectedTrendCsv(dynamicTrends[0].file);
-      setSelectedTrendTitle(dynamicTrends[0].label);
-      return;
-    }
+    // Only run if we have trends and no CSV selected yet
+    if (!dynamicTrends || dynamicTrends.length === 0) return;
+    if (selectedTrendCsv) return; // already initialized
 
+    const firstTrend = dynamicTrends[0];
+
+    setSelectedTrendCsv(firstTrend.file); // immediately select first CSV
+    setSelectedTrendTitle(firstTrend.label);
+    setActiveTrendView("TrendView1"); // always default to TrendView1
+  }, [dynamicTrends, selectedTrendCsv]); // ✅ dependencies only on real variables
+
+  // Timestamp updated by your watcher whenever CSV changes
+  const [filesTimestamp] = useState(Date.now()); // optional
+  useEffect(() => {
     if (!selectedTrendCsv) return;
 
-    setLoading(true);
-    setShowLoader(true);
-    const startTime = Date.now();
+    let lastCsvText = "";
+    let isMounted = true;
 
-    // ---------------- Determine environment ----------------
-    const isGitHub = window.location.hostname.includes("github.io");
+    const fetchCsv = async () => {
+      const csvUrl = `${process.env.PUBLIC_URL}/${selectedTrendCsv}?t=${filesTimestamp}`;
+      console.log("Fetching CSV due to timestamp change:", csvUrl);
 
-    // ---------------- Base CSV path ----------------
-    // Local dev: files in public/api/sharepoint/
-    // GitHub: files directly in public/
-    const csvBasePath = isGitHub ? "" : "/api/sharepoint";
+      try {
+        const res = await fetch(csvUrl);
+        if (!res.ok) throw new Error(`Failed to fetch CSV: ${res.status}`);
+        const csvText = await res.text();
 
-    // ---------------- URL Mapping (if needed) ----------------
-    // Only needed if selectedTrendCsv still has old SharePoint-style paths
-    const urlMap = {
-      "Oppurtunity_Tracker/FY25/Month/Jan/Application Data_Opportunity Tracker.csv":
-        "Application_Data_Opportunity_Tracker.csv",
-      "Oppurtunity_Tracker/FY25/Month/Jan/Ramp_Down_Tracker.csv":
-        "Application_Data_Ramp_Down.csv",
+        if (csvText && csvText !== lastCsvText) {
+          lastCsvText = csvText;
+
+          Papa.parse(csvText, {
+            header: true,
+            skipEmptyLines: true,
+            dynamicTyping: true,
+            complete: (results) => {
+              if (!isMounted) return;
+
+              const cleanHeaders = Object.keys(results.data[0] || {}).filter(
+                (h) => h && h.trim() !== "",
+              );
+
+              const cleanedData = results.data.map((row) => {
+                const newRow = {};
+                cleanHeaders.forEach((h) => (newRow[h] = row[h]));
+                return newRow;
+              });
+
+              setJsonData(cleanedData);
+              setHeaders(cleanHeaders);
+              setLoading(false);
+              setShowLoader(false);
+            },
+          });
+        }
+      } catch (err) {
+        console.error("CSV fetch error:", err);
+      }
     };
 
-    const mappedFile = urlMap[selectedTrendCsv] || selectedTrendCsv;
+    fetchCsv();
 
-    // ---------------- Final fetch URL ----------------
-    //const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}`;
-    const csvUrl = `${process.env.PUBLIC_URL}${csvBasePath}/${mappedFile}?v=${Date.now()}`;
-
-    // ---------- Console logs for debugging ----------
-    console.log("Environment:", isGitHub ? "GitHub Pages" : "Local dev");
-    console.log("Selected CSV:", selectedTrendCsv);
-    console.log("Mapped CSV file:", mappedFile);
-    console.log("Final fetch URL:", csvUrl);
-
-    // ---------------- Fetch CSV ----------------
-    fetch(csvUrl)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(
-            `Failed to fetch CSV: ${res.status} ${res.statusText}`,
-          );
-        }
-        return res.text();
-      })
-      .then((csvText) => {
-        if (!csvText || csvText.trim() === "") {
-          console.warn("CSV is empty:", mappedFile);
-          setJsonData([]);
-          setHeaders([]);
-          setLoading(false);
-          setShowLoader(false);
-          return;
-        }
-
-        // ---------------- Parse CSV ----------------
-        Papa.parse(csvText, {
-          header: true,
-          skipEmptyLines: true,
-          dynamicTyping: true,
-          complete: (results) => {
-            // ✅ Clean headers
-            const cleanHeaders = Object.keys(results.data[0] || {}).filter(
-              (h) => h && h.trim() !== "",
-            );
-
-            // ✅ Clean rows
-            const cleanedData = results.data.map((row) => {
-              const newRow = {};
-              cleanHeaders.forEach((h) => (newRow[h] = row[h]));
-              return newRow;
-            });
-
-            setJsonData(cleanedData);
-            setHeaders(cleanHeaders);
-
-            // Ensure loader shows at least 1s
-            const elapsed = Date.now() - startTime;
-            setTimeout(
-              () => {
-                setLoading(false);
-                setShowLoader(false);
-              },
-              Math.max(0, 1000 - elapsed),
-            );
-          },
-          error: (err) => {
-            console.error("Papa parse error:", err);
-            setJsonData([]);
-            setHeaders([]);
-            setLoading(false);
-            setShowLoader(false);
-          },
-        });
-      })
-      .catch((err) => {
-        console.error("CSV load error:", err, "URL:", csvUrl);
-        setJsonData([]);
-        setHeaders([]);
-        setLoading(false);
-        setShowLoader(false);
-      });
-  }, [dynamicTrends, selectedTrendCsv]);
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedTrendCsv, filesTimestamp]);
 
   const formatUSD = (val) => {
     if (val >= 1e6) return `$${(val / 1e6).toFixed(1)} M`;
@@ -595,15 +634,18 @@ const Dashboard = ({ user, onLogout }) => {
     setSelectedTrendCsv(csvFile);
     setSelectedTrendTitle(label);
 
-    if (csvFile.toLowerCase().includes("ramp")) {
-      setActiveTrendView("TrendView2");
+    const lowerFile = csvFile.toLowerCase();
+
+    if (lowerFile.includes("ramp")) {
+      setActiveTrendView("TrendView2"); // Ramp Down Project
+    } else if (lowerFile.includes("member") || lowerFile.includes("joiner")) {
+      setActiveTrendView("TrendView3"); // Member Detail / New Joiner List
     } else {
-      setActiveTrendView("TrendView1");
+      setActiveTrendView("TrendView1"); // Portfolio Health
     }
   };
 
   // ================== TABLE ==================
-
   const renderTable = () => (
     <div className="table-container">
       <table>
@@ -742,6 +784,25 @@ const Dashboard = ({ user, onLogout }) => {
           </div>
         )}
 
+        {/* ---------- TrendView3 Layout Dropdown ---------- */}
+        {activeTrendView === "TrendView3" && !isMobile && (
+          <div
+            style={{ marginBottom: 20, display: "flex", alignItems: "center" }}
+          >
+            <label htmlFor="trendView3Layout">Select TrendView3 Layout: </label>
+            <select
+              id="trendView3Layout"
+              value={trendView3Layout}
+              onChange={(e) => setTrendView3Layout(e.target.value)}
+              style={{ padding: "5px 10px", marginLeft: 10 }}
+            >
+              <option value="1x2">1 Row, 2 Columns</option>
+              <option value="3x1">Single Row</option>
+              <option value="1x3">1 Row, 3 Columns</option>
+            </select>
+          </div>
+        )}
+
         {/* ---------- Charts Grid ---------- */}
         <div
           className="charts-grid"
@@ -751,13 +812,187 @@ const Dashboard = ({ user, onLogout }) => {
             gridTemplateColumns: getGridColumns(
               activeTrendView === "TrendView1"
                 ? trendView1Layout
-                : trendView2Layout,
+                : activeTrendView === "TrendView2"
+                  ? trendView2Layout
+                  : activeTrendView === "TrendView3"
+                    ? trendView3Layout
+                    : "1fr", // fallback
             ),
           }}
         >
           {/* ---------- TrendView1 Charts ---------- */}
           {activeTrendView === "TrendView1" && (
             <>
+              {/* ===================== 🆕 2️⃣ OWNER QUARTERLY HC & CONTRACT TABLE ===================== */}
+
+              {startMonthKey &&
+                actualHcKey &&
+                monthlyContractValueKey &&
+                (() => {
+                  const tableYearsOptions1 = [
+                    ...new Set(
+                      filteredData
+                        .map((row) => {
+                          const m = row[startMonthKey];
+                          if (!m) return null;
+                          return parseInt(m.split("-")[1], 10) + 2000;
+                        })
+                        .filter(Boolean),
+                    ),
+                  ].sort((a, b) => a - b);
+
+                  const tableFilteredData1 = selectedTableYear1
+                    ? filteredData.filter((row) => {
+                        const m = row[startMonthKey];
+                        if (!m) return false;
+                        const yr = parseInt(m.split("-")[1], 10) + 2000;
+                        return yr === selectedTableYear1;
+                      })
+                    : filteredData;
+
+                  return (
+                    <div className="chart-card ppt-export">
+                      <h3>Owner Quarterly HC & Contract Value</h3>
+
+                      {/* Year dropdown */}
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={{ marginRight: 8 }}>Select Year:</label>
+
+                        <select
+                          value={selectedTableYear1 || ""}
+                          onChange={(e) =>
+                            setSelectedTableYear1(
+                              e.target.value
+                                ? parseInt(e.target.value, 10)
+                                : null,
+                            )
+                          }
+                          style={{ padding: "4px 8px", fontSize: 14 }}
+                        >
+                          <option value="">All Years</option>
+                          {tableYearsOptions1.map((y) => (
+                            <option key={y} value={y}>
+                              {y}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div ref={setTableRef1} className="table-responsive">
+                        <table className="dashboard-table">
+                          <thead>
+                            <tr>
+                              <th rowSpan={2} style={wrapCell}>
+                                Owner
+                              </th>
+                              {["Q1", "Q2", "Q3", "Q4"].map((q) => (
+                                <th key={q} colSpan={2} style={wrapCell}>
+                                  {q}
+                                </th>
+                              ))}
+                            </tr>
+
+                            <tr>
+                              {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => [
+                                <th key={`${q}-hc`} style={wrapCell}>
+                                  HC
+                                </th>,
+                                <th key={`${q}-cv`} style={wrapCell}>
+                                  Contract Value
+                                </th>,
+                              ])}
+                            </tr>
+                          </thead>
+
+                          <tbody>
+                            {[
+                              ...new Set(
+                                tableFilteredData1
+                                  .map((r) => (r?.Owner || "").trim())
+                                  .filter(Boolean),
+                              ),
+                            ].map((owner) => {
+                              const quarters = ["Q1", "Q2", "Q3", "Q4"];
+
+                              const values = quarters.map((q) => {
+                                const rows = tableFilteredData1.filter(
+                                  (row) => {
+                                    if (!row?.Owner) return false;
+                                    if (row.Owner.trim() !== owner)
+                                      return false;
+
+                                    const m = row[startMonthKey];
+                                    if (!m) return false;
+
+                                    const monthIndex =
+                                      new Date(`1-${m}`).getMonth() + 1;
+
+                                    const quarter =
+                                      monthIndex <= 3
+                                        ? "Q1"
+                                        : monthIndex <= 6
+                                          ? "Q2"
+                                          : monthIndex <= 9
+                                            ? "Q3"
+                                            : "Q4";
+
+                                    return quarter === q;
+                                  },
+                                );
+
+                                return {
+                                  hc: rows.reduce(
+                                    (s, r) => s + (Number(r[actualHcKey]) || 0),
+                                    0,
+                                  ),
+                                  cv: rows
+                                    .reduce(
+                                      (s, r) =>
+                                        s +
+                                        (Number(
+                                          String(
+                                            r[monthlyContractValueKey] || "",
+                                          ).replace(/[$,]/g, ""),
+                                        ) || 0),
+                                      0,
+                                    )
+                                    .toFixed(2),
+                                };
+                              });
+
+                              const allZero = values.every(
+                                (v) => v.hc === 0 && Number(v.cv) === 0,
+                              );
+                              if (allZero) return null;
+
+                              return (
+                                <tr key={owner}>
+                                  <td style={wrapCell}>{owner}</td>
+
+                                  {values.flatMap((v, i) => [
+                                    <td
+                                      key={`${owner}-${i}-hc`}
+                                      style={wrapCell}
+                                    >
+                                      {v.hc}
+                                    </td>,
+                                    <td
+                                      key={`${owner}-${i}-cv`}
+                                      style={wrapCell}
+                                    >
+                                      {v.cv}
+                                    </td>,
+                                  ])}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })()}
+
               {/* ===================== 1️⃣ Actual HC by Start Month ===================== */}
               {startMonthKey &&
                 actualHcKey &&
@@ -1288,7 +1523,6 @@ const Dashboard = ({ user, onLogout }) => {
             </>
           )}
           {/* ---------- TrendView2 Charts ---------- */}
-
           {activeTrendView === "TrendView2" &&
             hcBillableKey &&
             quarterlyLossKey &&
@@ -1319,191 +1553,146 @@ const Dashboard = ({ user, onLogout }) => {
 
               // 5️⃣ Render table card
               const combinedTableCard = (
-                <div className="chart-card ppt-export" style={{ padding: 20 }}>
-                  <h3 style={{ marginBottom: 12, color: "#333" }}>
-                    Total RampDown
-                  </h3>
-
-                  {/* Year dropdown and Column toggle */}
-                  <div
-                    style={{
-                      marginBottom: 12,
-                      display: "flex",
-                      gap: 20,
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <label style={{ marginRight: 8 }}>Select Year:</label>
-                      <select
-                        value={selectedTableYear || ""}
-                        onChange={(e) =>
-                          setSelectedTableYear(
-                            e.target.value
-                              ? parseInt(e.target.value, 10)
-                              : null,
-                          )
-                        }
-                        style={{ padding: "4px 8px", fontSize: 14 }}
-                      >
-                        <option value="">All Years</option>
-                        {tableYearsOptions.map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                <div className="chart-card ppt-export">
+                  <h3>Total RampDown</h3>
+                  {/* Year dropdown */}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ marginRight: 8 }}>Select Year:</label>
+                    <select
+                      value={selectedTableYear || ""}
+                      onChange={(e) =>
+                        setSelectedTableYear(
+                          e.target.value ? parseInt(e.target.value, 10) : null,
+                        )
+                      }
+                      style={{ padding: "4px 8px", fontSize: 14 }}
+                    >
+                      <option value="">All Years</option>
+                      {tableYearsOptions.map((y) => (
+                        <option key={y} value={y}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
-                  {/* Table Layout*/}
-                  <table
-                    style={{
-                      width: "100%",
-                      borderCollapse: "collapse",
-                      fontSize: "14px",
-                      tableLayout: "fixed",
-                    }}
-                  >
-                    <thead>
-                      <tr
-                        style={{
-                          backgroundColor: "rgb(30, 58, 138)",
-                          textAlign: "center",
-                        }}
-                      >
-                        <th
-                          rowSpan={2}
-                          style={{
-                            ...wrapCell,
-                            color: "white",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          Owner
-                        </th>
-
-                        {["Q1", "Q2", "Q3", "Q4"].map((q) => (
-                          <th
-                            key={q}
-                            colSpan={2}
-                            style={{
-                              ...wrapCell,
-                              color: "white",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            {q}
+                  {/* Table */}
+                  <div ref={setTableRef2} className="table-responsive">
+                    <table className="dashboard-table">
+                      <thead>
+                        <tr>
+                          <th rowSpan={2} style={wrapCell}>
+                            Owner
                           </th>
-                        ))}
-                      </tr>
+                          {["Q1", "Q2", "Q3", "Q4"].map((q) => (
+                            <th key={q} colSpan={3} style={wrapCell}>
+                              {q}
+                            </th>
+                          ))}
+                        </tr>
+                        <tr>
+                          {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => [
+                            <th key={`${q}-hc`} style={wrapCell}>
+                              HC
+                            </th>,
+                            <th key={`${q}-rev`} style={wrapCell}>
+                              Revenue Loss
+                            </th>,
+                            <th key={`${q}-loss`} style={wrapCell}>
+                              Quarterly Loss
+                            </th>,
+                          ])}
+                        </tr>
+                      </thead>
 
-                      <tr
-                        style={{
-                          backgroundColor: "rgb(224, 242, 254)",
-                          textAlign: "center",
-                        }}
-                      >
-                        {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => [
-                          <th
-                            key={`${q}-hc`}
-                            style={{
-                              ...wrapCell,
-                              color: "black",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            HC
-                          </th>,
-                          <th
-                            key={`${q}-rev`}
-                            style={{
-                              ...wrapCell,
-                              color: "black",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            Revenue
-                          </th>,
-                        ])}
-                      </tr>
-                    </thead>
+                      <tbody>
+                        {[
+                          ...new Set(
+                            tableFilteredData
+                              .map((r) => (r?.Owner || "").trim())
+                              .filter((owner) => owner !== ""),
+                          ),
+                        ].map((owner) => {
+                          const quarters = ["Q1", "Q2", "Q3", "Q4"];
 
-                    <tbody>
-                      {[
-                        ...new Set(
-                          tableFilteredData
-                            .map((r) => (r?.Owner || "").trim()) // convert null/undefined to "" and trim
-                            .filter((owner) => owner !== ""), // remove any empty strings
-                        ),
-                      ].map((owner, idx) => {
-                        const getQuarterValues = (quarter) => {
-                          const rows = tableFilteredData.filter((row) => {
-                            if (!row?.Owner) return false;
-                            if (row.Owner.trim() !== owner) return false;
+                          const quarterValues = quarters.map((q) => {
+                            const rows = tableFilteredData.filter((row) => {
+                              if (!row?.Owner) return false;
+                              if (row.Owner.trim() !== owner) return false;
 
-                            const m = row[monthKey];
-                            if (!m) return false;
+                              const m = row[monthKey];
+                              if (!m) return false;
 
-                            const month = new Date(`1-${m}`).getMonth() + 1;
-                            const q =
-                              month <= 3
-                                ? "Q1"
-                                : month <= 6
-                                  ? "Q2"
-                                  : month <= 9
-                                    ? "Q3"
-                                    : "Q4";
+                              const month = new Date(`1-${m}`).getMonth() + 1;
+                              const quarter =
+                                month <= 3
+                                  ? "Q1"
+                                  : month <= 6
+                                    ? "Q2"
+                                    : month <= 9
+                                      ? "Q3"
+                                      : "Q4";
 
-                            return q === quarter;
+                              return quarter === q;
+                            });
+
+                            return {
+                              hc: rows.reduce(
+                                (s, r) => s + parseHC(r[hcBillableKey]),
+                                0,
+                              ),
+                              revenue: rows
+                                .reduce(
+                                  (s, r) =>
+                                    s + parseMoney(r[monthlyRevenueKey]),
+                                  0,
+                                )
+                                .toFixed(2),
+                              loss: rows
+                                .reduce(
+                                  (s, r) => s + parseMoney(r[quarterlyLossKey]),
+                                  0,
+                                )
+                                .toFixed(2),
+                            };
                           });
 
-                          return {
-                            hc: rows.reduce(
-                              (s, r) => s + safeNumber(r[hcBillableKey]),
-                              0,
-                            ),
-                            revenue: rows
-                              .reduce(
-                                (s, r) => s + safeNumber(r[monthlyRevenueKey]),
-                                0,
-                              )
-                              .toFixed(2),
-                          };
-                        };
+                          const allZero = quarterValues.every(
+                            (qv) =>
+                              qv.hc === 0 &&
+                              Number(qv.revenue) === 0 &&
+                              Number(qv.loss) === 0,
+                          );
+                          if (allZero) return null;
 
-                        return (
-                          <tr
-                            key={owner}
-                            style={{
-                              backgroundColor:
-                                idx % 2 === 0 ? "#fff" : "#f9fafb",
-                            }}
-                          >
-                            <td style={{ ...wrapCell }}>{owner}</td>
-
-                            {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => {
-                              const v = getQuarterValues(q);
-                              return [
+                          return (
+                            <tr key={owner}>
+                              <td style={wrapCell}>{owner}</td>
+                              {quarterValues.flatMap((v, i) => [
                                 <td
-                                  key={`${owner}-${q}-hc`}
-                                  style={{ ...wrapCell, textAlign: "center" }}
+                                  key={`${owner}-Q${i + 1}-hc`}
+                                  style={wrapCell}
                                 >
                                   {v.hc}
                                 </td>,
                                 <td
-                                  key={`${owner}-${q}-rev`}
-                                  style={{ ...wrapCell, textAlign: "center" }}
+                                  key={`${owner}-Q${i + 1}-rev`}
+                                  style={wrapCell}
                                 >
                                   {v.revenue}
                                 </td>,
-                              ];
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                                <td
+                                  key={`${owner}-Q${i + 1}-loss`}
+                                  style={wrapCell}
+                                >
+                                  {v.loss}
+                                </td>,
+                              ])}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               );
 
@@ -1921,6 +2110,123 @@ const Dashboard = ({ user, onLogout }) => {
                 </>
               );
             })()}
+
+          {/* ---------- TrendView3 FJ Chart Only (FJ Level on X-axis) ---------- */}
+          {activeTrendView === "TrendView3" &&
+            (() => {
+              const memberNameKey = "Member Name";
+              const fjLevelKey = "FJ level";
+
+              if (!filteredData || filteredData.length === 0) return null;
+
+              const fjLevels = [
+                ...new Set(
+                  filteredData.map((r) => r[fjLevelKey]).filter(Boolean),
+                ),
+              ].sort(
+                (a, b) =>
+                  parseInt(a.replace("FJ", ""), 10) -
+                  parseInt(b.replace("FJ", ""), 10),
+              );
+
+              const memberCountData = fjLevels.map((level) => {
+                const members = filteredData
+                  .filter((r) => r[fjLevelKey] === level && r[memberNameKey])
+                  .map((r) => r[memberNameKey]);
+                return [...new Set(members)].length;
+              });
+
+              const fjLevelCountData = fjLevels.map(
+                (level) =>
+                  filteredData.filter((r) => r[fjLevelKey] === level).length,
+              );
+
+              if (!fjChartRef.current) fjChartRef.current = React.createRef();
+
+              const totalMemberCount = memberCountData.reduce(
+                (a, b) => a + b,
+                0,
+              );
+
+              const data = {
+                labels: [...fjLevels, "Members"], // last slice for member count
+                datasets: [
+                  {
+                    label: "FJ vs Member",
+                    data: [...fjLevelCountData, totalMemberCount],
+                    backgroundColor: [
+                      ...fjLevelCountData.map(
+                        (_, i) =>
+                          `hsl(${(i * 360) / fjLevelCountData.length}, 60%, 65%)`,
+                      ),
+                      "#4caf50", // member slice color
+                    ],
+                    borderColor: "#fff",
+                    borderWidth: 1,
+                    hoverOffset: 10,
+                  },
+                ],
+              };
+
+              const options = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    display: true,
+                    position: "top",
+                    labels: {
+                      font: { size: 12, weight: "bold" },
+                      generateLabels: (chart) => {
+                        return chart.data.labels
+                          .map((label, index) => {
+                            // hide member slice from legend
+                            if (label === "Members") return null;
+                            const value = chart.data.datasets[0].data[index];
+                            const color =
+                              chart.data.datasets[0].backgroundColor[index];
+                            return {
+                              text: `${label} (${value})`, // show FJ level with value
+                              fillStyle: color,
+                              strokeStyle: "#fff",
+                              lineWidth: 1,
+                              hidden: false,
+                              index,
+                            };
+                          })
+                          .filter(Boolean);
+                      },
+                    },
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function (context) {
+                        return `${context.label}: ${context.raw}`;
+                      },
+                    },
+                  },
+                  datalabels: {
+                    color: "#000",
+                    font: { size: 12, weight: "bold" },
+                    formatter: (value, context) => value,
+                  },
+                },
+              };
+
+              return (
+                <div className="chart-card large-chart ppt-export">
+                  <h3>FJ Level vs Member Count</h3>
+                  <div className="chart-container" style={{ height: 350 }}>
+                    <Doughnut
+                      ref={fjChartRef}
+                      data={data}
+                      options={options}
+                      plugins={[ChartDataLabels]}
+                    />
+                  </div>
+                </div>
+              );
+            })()}
         </div>
       </>
     );
@@ -2024,15 +2330,6 @@ const Dashboard = ({ user, onLogout }) => {
                   </option>
                 ))}
               </select>
-
-              {/* <select
-                className="download-select"
-                onChange={(e) => handleDownloadFullSection(e.target.value)}
-              >
-                <option value="">Download As</option>
-                <option value="png">PNG</option>
-                <option value="jpg">JPG</option>
-              </select> */}
 
               <select
                 className="download-select"

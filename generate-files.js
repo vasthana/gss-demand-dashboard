@@ -13,28 +13,27 @@ const SHAREPOINT_BASE_PATH = ONE_DRIVE_BASE
   : null;
 
 // Folders to scan
-const TRACKER_FOLDERS = ["Demand Tracker_New Transitions", "Ramp Down Tracker"];
+const TRACKER_FOLDERS = [
+  "Demand Tracker_New Transitions",
+  "Ramp Down Tracker",
+  "Project Member Detail Tracker",
+];
 
-// Destination folders
+// Destination folder
 const PUBLIC_FOLDER = path.join(__dirname, "public");
-const API_FOLDER = path.join(PUBLIC_FOLDER, "api");
-const OUTPUT_PATH = path.join(API_FOLDER, "files.json");
+const OUTPUT_PATH = path.join(PUBLIC_FOLDER, "files.json");
+
+// Ensure PUBLIC_FOLDER exists
+if (!fs.existsSync(PUBLIC_FOLDER)) {
+  fs.mkdirSync(PUBLIC_FOLDER, { recursive: true });
+}
 
 function updateFilesJson() {
   try {
     if (!SHAREPOINT_BASE_PATH || !fs.existsSync(SHAREPOINT_BASE_PATH)) {
       console.warn("⚠️ SharePoint folder not found.");
-      if (!fs.existsSync(API_FOLDER))
-        fs.mkdirSync(API_FOLDER, { recursive: true });
       fs.writeFileSync(OUTPUT_PATH, JSON.stringify({ files: [] }, null, 2));
       return;
-    }
-
-    if (!fs.existsSync(PUBLIC_FOLDER)) {
-      fs.mkdirSync(PUBLIC_FOLDER, { recursive: true });
-    }
-    if (!fs.existsSync(API_FOLDER)) {
-      fs.mkdirSync(API_FOLDER, { recursive: true });
     }
 
     const allFiles = [];
@@ -61,19 +60,22 @@ function updateFilesJson() {
         const destination = path.join(PUBLIC_FOLDER, file);
 
         fs.copyFileSync(source, destination);
+        console.log(`✅ Copied ${file} → ${destination}`);
 
-        // ✅ Store only filename in JSON
+        // Store only filename in JSON
         allFiles.push(file);
       });
     });
 
-    // ✅ Final JSON
+    // Write files.json in /public
     fs.writeFileSync(OUTPUT_PATH, JSON.stringify({ files: allFiles }, null, 2));
-
-    console.log("✅ flex.json updated successfully!");
+    console.log(
+      `✅ files.json updated successfully! (${allFiles.length} files)`,
+    );
   } catch (err) {
     console.error("❌ Unexpected Error:", err.message);
   }
 }
 
+// Run the update
 updateFilesJson();

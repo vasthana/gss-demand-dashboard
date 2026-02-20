@@ -139,6 +139,8 @@
 .submenu li.active {
   background: #2563eb;
   color: #ffffff;
+  line-height: 14px;
+  padding-top: 10px;
 }
 
 .submenu {
