@@ -1885,7 +1885,6 @@ const Dashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
               );
-
               // ---------- ONLY PROJECT CHART ----------
               const rampCharts = [
                 { title: "Project-wise Ramp Down", key: projectKey },
