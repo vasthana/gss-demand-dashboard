@@ -841,22 +841,64 @@ const Dashboard = ({ user, onLogout }) => {
                       filteredData
                         .map((row) => {
                           const m = row[startMonthKey];
-                          if (!m) return null;
-                          return parseInt(m.split("-")[1], 10) + 2000;
+                          if (!m || typeof m !== "string") return null;
+
+                          const parts = m.split("-");
+                          if (parts.length < 2) return null;
+
+                          const year = parseInt(parts[1], 10);
+                          if (isNaN(year)) return null;
+
+                          return 2000 + year; // convert 25 -> 2025
                         })
-                        .filter(Boolean),
+                        .filter((yr) => yr !== null),
                     ),
                   ].sort((a, b) => a - b);
 
-                  const tableFilteredData1 = selectedTableYear1
-                    ? filteredData.filter((row) => {
-                        const m = row[startMonthKey];
-                        if (!m) return false;
-                        const yr = parseInt(m.split("-")[1], 10) + 2000;
-                        return yr === selectedTableYear1;
-                      })
-                    : filteredData;
+                  // Filter data for the selected year
+                  const tableFilteredData1 = (
+                    selectedTableYear1
+                      ? filteredData.filter((row) => {
+                          const m = row[startMonthKey];
+                          if (!m || typeof m !== "string") return false;
 
+                          const parts = m.split("-");
+                          if (parts.length < 2) return false;
+
+                          const year = parseInt(parts[1], 10);
+                          if (isNaN(year)) return false;
+
+                          return 2000 + year === selectedTableYear1;
+                        })
+                      : filteredData
+                  ).map((row) => {
+                    const newRow = { ...row };
+
+                    // Round all HC values to integers
+                    Object.keys(newRow).forEach((key) => {
+                      if (
+                        key.toLowerCase().includes("hc") &&
+                        typeof newRow[key] === "number"
+                      ) {
+                        newRow[key] = Math.round(newRow[key]);
+                      }
+
+                      // Round Contract Value columns to integers and remove dot
+                      if (
+                        (key.toLowerCase().includes("contract") ||
+                          key.toLowerCase().includes("cv")) &&
+                        newRow[key] != null
+                      ) {
+                        // Remove commas, parse float, round to integer
+                        const val = parseFloat(
+                          String(newRow[key]).replace(/,/g, "").trim(),
+                        );
+                        newRow[key] = isNaN(val) ? 0 : Math.round(val);
+                      }
+                    });
+
+                    return newRow;
+                  });
                   return (
                     <div className="chart-card ppt-export">
                       <h3>Owner Quarterly HC & Contract Value</h3>
@@ -933,7 +975,6 @@ const Dashboard = ({ user, onLogout }) => {
 
                                     const monthIndex =
                                       new Date(`1-${m}`).getMonth() + 1;
-
                                     const quarter =
                                       monthIndex <= 3
                                         ? "Q1"
@@ -948,34 +989,37 @@ const Dashboard = ({ user, onLogout }) => {
                                 );
 
                                 return {
+                                  // Round HC to integer
                                   hc: rows.reduce(
-                                    (s, r) => s + (Number(r[actualHcKey]) || 0),
+                                    (s, r) =>
+                                      s +
+                                      Math.round(Number(r[actualHcKey]) || 0),
                                     0,
                                   ),
-                                  cv: rows
-                                    .reduce(
-                                      (s, r) =>
-                                        s +
-                                        (Number(
-                                          String(
-                                            r[monthlyContractValueKey] || "",
-                                          ).replace(/[$,]/g, ""),
-                                        ) || 0),
-                                      0,
-                                    )
-                                    .toFixed(2),
+
+                                  // Parse Contract Value, remove commas, round to integer
+                                  cv: rows.reduce((s, r) => {
+                                    const val = parseFloat(
+                                      String(r[monthlyContractValueKey] || "")
+                                        .replace(/[$,]/g, "")
+                                        .trim(),
+                                    );
+                                    return (
+                                      s + (isNaN(val) ? 0 : Math.round(val))
+                                    );
+                                  }, 0),
                                 };
                               });
 
+                              // Skip rows where all quarters are zero
                               const allZero = values.every(
-                                (v) => v.hc === 0 && Number(v.cv) === 0,
+                                (v) => v.hc === 0 && v.cv === 0,
                               );
                               if (allZero) return null;
 
                               return (
                                 <tr key={owner}>
                                   <td style={wrapCell}>{owner}</td>
-
                                   {values.flatMap((v, i) => [
                                     <td
                                       key={`${owner}-${i}-hc`}
@@ -1054,13 +1098,18 @@ const Dashboard = ({ user, onLogout }) => {
                     const hc = Math.round(
                       Number(safeNumber(row[hcBillableKey])),
                     );
-
                     // --- Clean Quarterly Loss ---
                     let lossRaw = row[quarterlyLossKey];
                     let loss = 0;
+                    // if (lossRaw) {
+                    //   loss = parseFloat(
+                    //     String(lossRaw).replace(/[\$,]/g, "").trim(),
+                    //   );
+                    //   loss = Math.round(isNaN(loss) ? 0 : loss);
+                    // }
                     if (lossRaw) {
                       loss = parseFloat(
-                        String(lossRaw).replace(/[\$,]/g, "").trim(),
+                        String(lossRaw).replace(/[$,]/g, "").trim(), // removed unnecessary backslash
                       );
                       loss = Math.round(isNaN(loss) ? 0 : loss);
                     }
@@ -1281,12 +1330,11 @@ const Dashboard = ({ user, onLogout }) => {
 
                   {/* Year Dropdown */}
                   {(() => {
-                    // 1️⃣ Extract years from areaChartData.months
                     const years = [
                       ...new Set(
                         areaChartData.months.map((m) => {
-                          const [, yr] = m.split("-"); // Ignore month
-                          return parseInt(yr, 10) + 2000; // "25" -> 2025
+                          const [, yr] = m.split("-");
+                          return parseInt(yr, 10) + 2000;
                         }),
                       ),
                     ].sort((a, b) => a - b);
@@ -1303,7 +1351,7 @@ const Dashboard = ({ user, onLogout }) => {
                         }
                         style={{
                           marginBottom: 12,
-                          width: "20%", // Adjust as needed
+                          width: "20%",
                           padding: "4px 8px",
                           fontSize: 14,
                         }}
@@ -1331,13 +1379,17 @@ const Dashboard = ({ user, onLogout }) => {
                       {
                         label: "Head Count",
                         color: "#af4c96",
-                        data: areaChartData.hcValues.map(Number),
+                        data: areaChartData.hcValues.map((v) =>
+                          Math.round(Number(v)),
+                        ),
                       },
                       {
                         label: "Contract Value",
                         color: "#4caf50",
                         data: areaChartData.contractValues
-                          ? areaChartData.contractValues.map(Number)
+                          ? areaChartData.contractValues.map((v) =>
+                              Math.round(Number(v)),
+                            )
                           : [],
                       },
                     ].map((ds, i) => {
@@ -1388,7 +1440,7 @@ const Dashboard = ({ user, onLogout }) => {
                               opacity: isActive ? 1 : 0.5,
                             }}
                           >
-                            {ds.label} ({total.toFixed(2)})
+                            {ds.label} ({Math.round(total)})
                           </span>
                         </div>
                       );
@@ -1413,14 +1465,18 @@ const Dashboard = ({ user, onLogout }) => {
                           trend1Visible[0] && {
                             label: "Head Count",
                             data: selectedFY2
-                              ? areaChartData.hcValues.filter((_, idx) => {
-                                  const [, yr] =
-                                    areaChartData.months[idx].split("-");
-                                  return (
-                                    parseInt(yr, 10) + 2000 === selectedFY2
-                                  );
-                                })
-                              : areaChartData.hcValues,
+                              ? areaChartData.hcValues
+                                  .map((v) => Math.round(Number(v)))
+                                  .filter((_, idx) => {
+                                    const [, yr] =
+                                      areaChartData.months[idx].split("-");
+                                    return (
+                                      parseInt(yr, 10) + 2000 === selectedFY2
+                                    );
+                                  })
+                              : areaChartData.hcValues.map((v) =>
+                                  Math.round(Number(v)),
+                                ),
                             borderColor: "#af4c96",
                             backgroundColor: "rgba(114,1,75,0.3)",
                             fill: true,
@@ -1430,16 +1486,18 @@ const Dashboard = ({ user, onLogout }) => {
                           trend1Visible[1] && {
                             label: "Contract Value",
                             data: selectedFY2
-                              ? areaChartData.contractValues.filter(
-                                  (_, idx) => {
+                              ? areaChartData.contractValues
+                                  .map((v) => Math.round(Number(v)))
+                                  .filter((_, idx) => {
                                     const [, yr] =
                                       areaChartData.months[idx].split("-");
                                     return (
                                       parseInt(yr, 10) + 2000 === selectedFY2
                                     );
-                                  },
-                                )
-                              : areaChartData.contractValues,
+                                  })
+                              : areaChartData.contractValues.map((v) =>
+                                  Math.round(Number(v)),
+                                ),
                             borderColor: "#4caf50",
                             backgroundColor: "rgba(76,175,80,0.3)",
                             fill: false,
@@ -1464,7 +1522,7 @@ const Dashboard = ({ user, onLogout }) => {
                             color: "#000",
                             font: { weight: "bold", size: 11 },
                             formatter: (value) =>
-                              value !== undefined ? value.toFixed(2) : "0.00",
+                              value !== undefined ? Math.round(value) : 0,
                           },
                         },
                         scales: { y: { beginAtZero: true } },
@@ -1473,12 +1531,12 @@ const Dashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
               )}
-
               {/* ===================== 3️⃣ HC by Business Group ===================== */}
               {Object.keys(hcByBG).length > 0 && (
                 <div className="chart-card large-chart ppt-export">
                   <h3>Head Count by Business Group</h3>
 
+                  {/* Toggle HC */}
                   <div
                     style={{
                       display: "flex",
@@ -1506,13 +1564,14 @@ const Dashboard = ({ user, onLogout }) => {
                       }}
                     >
                       HC (
-                      {Object.values(hcByBG)
-                        .reduce((a, b) => a + b, 0)
-                        .toFixed(2)}
+                      {Math.round(
+                        Object.values(hcByBG).reduce((a, b) => a + b, 0),
+                      )}
                       )
                     </span>
                   </div>
 
+                  {/* Bar Chart */}
                   <div className="chart-container">
                     <Bar
                       data={{
@@ -1521,7 +1580,9 @@ const Dashboard = ({ user, onLogout }) => {
                           ? [
                               {
                                 label: "HC",
-                                data: Object.values(hcByBG),
+                                data: Object.values(hcByBG).map((v) =>
+                                  Math.round(v),
+                                ),
                                 backgroundColor: "#FF9800",
                                 borderRadius: 6,
                               },
@@ -1539,6 +1600,7 @@ const Dashboard = ({ user, onLogout }) => {
                             align: "end",
                             color: "#000",
                             font: { weight: "bold", size: 11 },
+                            formatter: (value) => Math.round(value),
                           },
                         },
                       }}
@@ -1563,7 +1625,7 @@ const Dashboard = ({ user, onLogout }) => {
                     {Object.entries(hcByStakeholder)
                       .filter(([k]) => k && k !== "Unknown")
                       .map(([label, value], i) => {
-                        const safeVal = safeNumber(value);
+                        const safeVal = Math.round(safeNumber(value));
                         const isActive = stakeholderVisible[i];
                         const colors = [
                           "#009688",
@@ -1606,7 +1668,7 @@ const Dashboard = ({ user, onLogout }) => {
                                 opacity: isActive ? 1 : 0.5,
                               }}
                             >
-                              {label} ({safeVal.toFixed(2)})
+                              {label} ({safeVal})
                             </span>
                           </div>
                         );
@@ -1624,7 +1686,9 @@ const Dashboard = ({ user, onLogout }) => {
                             data: Object.entries(hcByStakeholder)
                               .filter(([k]) => k && k !== "Unknown")
                               .map(([_, v], i) =>
-                                stakeholderVisible[i] ? safeNumber(v) : 0,
+                                stakeholderVisible[i]
+                                  ? Math.round(safeNumber(v))
+                                  : 0,
                               ),
                             backgroundColor: [
                               "#009688",
@@ -1653,7 +1717,7 @@ const Dashboard = ({ user, onLogout }) => {
                             font: { weight: "bold", size: 11 },
                             formatter: (value) =>
                               value !== undefined && value !== 0
-                                ? value.toFixed(2)
+                                ? Math.round(value)
                                 : "",
                           },
                         },
@@ -1722,18 +1786,26 @@ const Dashboard = ({ user, onLogout }) => {
                     <table className="dashboard-table">
                       <thead>
                         <tr>
-                          <th rowSpan={2}>Owner</th>
+                          <th rowSpan={2} style={wrapCell}>
+                            Owner
+                          </th>
                           {["Q1", "Q2", "Q3", "Q4"].map((q) => (
-                            <th key={q} colSpan={3}>
+                            <th key={q} colSpan={3} style={wrapCell}>
                               {q}
                             </th>
                           ))}
                         </tr>
                         <tr>
                           {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => [
-                            <th key={`${q}-hc`}>HC</th>,
-                            <th key={`${q}-rev`}>Revenue Loss</th>,
-                            <th key={`${q}-loss`}>Quarterly Loss</th>,
+                            <th key={`${q}-hc`} style={wrapCell}>
+                              HC
+                            </th>,
+                            <th key={`${q}-rev`} style={wrapCell}>
+                              Revenue Loss
+                            </th>,
+                            <th key={`${q}-loss`} style={wrapCell}>
+                              Quarterly Loss
+                            </th>,
                           ])}
                         </tr>
                       </thead>
@@ -1793,16 +1865,16 @@ const Dashboard = ({ user, onLogout }) => {
 
                           return (
                             <tr key={owner}>
-                              <td>{owner}</td>
+                              <td style={wrapCell}>{owner}</td>
                               {["Q1", "Q2", "Q3", "Q4"].flatMap((q) => [
-                                <td key={`${owner}-${q}-hc`}>
+                                <td key={`${owner}-${q}-hc`} style={wrapCell}>
                                   {quarterTotals[q].hc}
                                 </td>,
-                                <td key={`${owner}-${q}-rev`}>
-                                  {quarterTotals[q].rev.toFixed(2)}
+                                <td key={`${owner}-${q}-rev`} style={wrapCell}>
+                                  {Math.round(quarterTotals[q].rev)}
                                 </td>,
-                                <td key={`${owner}-${q}-loss`}>
-                                  {quarterTotals[q].loss.toFixed(2)}
+                                <td key={`${owner}-${q}-loss`} style={wrapCell}>
+                                  {Math.round(quarterTotals[q].loss)}
                                 </td>,
                               ])}
                             </tr>
@@ -2123,14 +2195,12 @@ const Dashboard = ({ user, onLogout }) => {
                       ),
                       "#4caf50", // member slice color
                     ],
-                    borderColor: "#fff",
-                    borderWidth: 1,
-                    hoverOffset: 10,
                   },
                 ],
               };
 
               const options = {
+                indexAxis: "y", // horizontal bars
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
@@ -2142,13 +2212,12 @@ const Dashboard = ({ user, onLogout }) => {
                       generateLabels: (chart) => {
                         return chart.data.labels
                           .map((label, index) => {
-                            // hide member slice from legend
-                            if (label === "Members") return null;
+                            if (label === "Members") return null; // skip members in legend
                             const value = chart.data.datasets[0].data[index];
                             const color =
                               chart.data.datasets[0].backgroundColor[index];
                             return {
-                              text: `${label} (${value})`, // show FJ level with value
+                              text: `${label} (${value})`,
                               fillStyle: color,
                               strokeStyle: "#fff",
                               lineWidth: 1,
@@ -2170,7 +2239,14 @@ const Dashboard = ({ user, onLogout }) => {
                   datalabels: {
                     color: "#000",
                     font: { size: 12, weight: "bold" },
-                    formatter: (value, context) => value,
+                    align: "end", // align label at the end of bar
+                    anchor: "end", // position outside the bar
+                    formatter: (value) => value,
+                  },
+                },
+                scales: {
+                  x: {
+                    beginAtZero: true,
                   },
                 },
               };
@@ -2178,8 +2254,8 @@ const Dashboard = ({ user, onLogout }) => {
               return (
                 <div className="chart-card large-chart ppt-export">
                   <h3>FJ Level vs Member Count</h3>
-                  <div className="chart-container" style={{ height: 350 }}>
-                    <Doughnut
+                  <div className="chart-container" style={{ height: 400 }}>
+                    <Bar
                       ref={fjChartRef}
                       data={data}
                       options={options}
